@@ -1,0 +1,3 @@
+[console_scripts]
+dominion = dominion.ui.cli:main
+dominion-web = dominion.web.server:main

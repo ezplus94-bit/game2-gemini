@@ -1,0 +1,9 @@
+
+[dev]
+pytest>=7
+fastapi
+uvicorn[standard]
+
+[web]
+fastapi
+uvicorn[standard]
