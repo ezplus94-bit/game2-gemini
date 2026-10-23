@@ -109,6 +109,8 @@ class Game:
         s.actions -= 1
         s.plays_this_turn += 1
         s.log.append(f"{me.name} plays {card}.", "play")
+        if get_card(card).on_next_turn is not None and card != "Tactician":
+            me.duration_effects.append(card)
         result = get_card(card).on_play(EffectContext(s, player, card))
         if inspect.isgenerator(result):
             self._advance(result, None, card)
@@ -136,6 +138,7 @@ class Game:
         s.coins -= card_cost(s, card)
         s.potions -= get_card(card).potion_cost
         s.buys -= 1
+        s.bought_this_turn.append(card)
         zones.gain_card(s, player, card)
         taker = zones.beneficiary(s, player)
         s.players[taker].bought.append(card)
@@ -143,6 +146,9 @@ class Game:
             s.log.append(f"{s.players[player].name} buys {card} for {s.players[taker].name} (Possession).", "buy")
         else:
             s.log.append(f"{s.players[player].name} buys {card}.", "buy")
+        for _ in range(s.embargo_tokens.get(card, 0)):
+            if zones.gain_card(s, player, "Curse"):
+                s.log.append(f"{s.players[taker].name} gains a Curse (Embargo on {card}).", "trash", 1)
 
     def _cheat(self, player: int, kind: str) -> None:
         s = self.state
@@ -221,13 +227,33 @@ class Game:
         if returned:
             s.log.append(f"{me.name}'s {returned} trashed card(s) return to their discard pile.", "reveal")
         me.discard.extend(me.hand)
-        me.discard.extend(me.in_play)
+        still_active = []
+        resolved = list(me.resolved_durations)
+        me.resolved_durations.clear()
+        for card in me.in_play:
+            if card in resolved:
+                resolved.remove(card)
+                me.discard.append(card)
+            elif get_card(card).is_type(CardType.DURATION):
+                if card == "Tactician" and me.tactician_active == 0:
+                    me.discard.append(card)
+                elif card == "Outpost" and s.outpost_turn:
+                    me.discard.append(card)
+                else:
+                    still_active.append(card)
+            else:
+                me.discard.append(card)
         me.hand.clear()
         me.in_play.clear()
-        zones.draw_cards(s, player, HAND_SIZE)
+        me.duration.extend(still_active)
+        draw_count = 3 if (s.outpost_queued and not s.outpost_turn) else HAND_SIZE
+        zones.draw_cards(s, player, draw_count)
+        me.last_turn_gained = list(me.gained_this_turn)
+        me.gained_this_turn.clear()
         me.turns_taken += 1
         s.actions, s.buys, s.coins = 1, 1, 0
         s.potions = 0
+        s.bought_this_turn.clear()
         s.triggers.clear()
         s.buy_locked = False
         s.cost_reduction = 0
@@ -251,9 +277,36 @@ class Game:
         else:
             self._after_turn(player)
 
-    def _after_turn(self, player: int) -> None:
-        """Decide whose turn comes next, keeping Possession's extra turns in mind."""
+    def _resolve_start_of_turn_durations(self, player: int) -> None:
         s = self.state
+        me = s.players[player]
+        active_cards = list(me.duration)
+        me.duration.clear()
+        for card in active_cards:
+            me.in_play.append(card)
+            me.resolved_durations.append(card)
+        effects = list(me.duration_effects)
+        me.duration_effects.clear()
+        for card in effects:
+            fn = get_card(card).on_next_turn
+            if fn is not None:
+                s.log.append(f"{me.name}'s {card} resolves.", "play", 1)
+                res = fn(EffectContext(s, player, card))
+                if inspect.isgenerator(res):
+                    self._advance(res, None, card)
+
+    def _after_turn(self, player: int) -> None:
+        """Decide whose turn comes next, keeping Outpost and Possession's extra turns in mind."""
+        s = self.state
+        if s.outpost_queued and not s.outpost_turn:
+            s.outpost_queued = False
+            s.outpost_turn = True
+            s.turn_number += 1
+            s.log.append(f"Turn {s.turn_number} - {s.players[player].name} (Outpost)", "turn")
+            self._resolve_start_of_turn_durations(player)
+            return
+        s.outpost_turn = False
+        s.outpost_queued = False
         if s.possessor is not None:                          # a possessed turn just ended
             possessor = s.possessor
             s.possessor = None
@@ -279,6 +332,7 @@ class Game:
             f"Turn {s.turn_number} - {s.players[s.current_player].name} (possessed by {s.players[possessor].name})",
             "turn",
         )
+        self._resolve_start_of_turn_durations(s.current_player)
 
     def _next_turn(self, advance: bool = True) -> None:
         """Pass the turn, consuming skipped turns (a skipped turn still counts as taken).
@@ -305,6 +359,7 @@ class Game:
                 s.coins += nxt.bonus_coins
                 s.log.append(f"{nxt.name} receives ${nxt.bonus_coins} from Rosebud.", "gain", 1)
                 nxt.bonus_coins = 0
+            self._resolve_start_of_turn_durations(s.current_player)
             return
 
     def _finish(self, winners=None) -> None:

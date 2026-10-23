@@ -10,7 +10,7 @@
     --ink: #e8e9ee; --muted: #9aa0b2; --accent: #6cb4ff; --good: #3fb56b; --bad: #e0576a; --warn: #e3b341;
     --card-ink: #1d1d22; --shadow: 0 2px 8px rgba(0,0,0,.45);
     --c-action: #d9d4c3; --c-treasure: #f1cf61; --c-victory: #8fd19a; --c-curse: #c79be0;
-    --c-reaction: #8fbfee; --c-attack: #ee9f94; --c-catastrophe: #3a2229; --c-special: #8fe3d4;
+    --c-reaction: #8fbfee; --c-attack: #ee9f94; --c-duration: #f29e4c; --c-catastrophe: #3a2229; --c-special: #8fe3d4;
     --log-play: #8fbfee; --log-treasure: #f1cf61; --log-buy: #6fdc8c; --log-gain: #9be0ae; --log-trash: #ee8f8f;
     --log-discard: #c1a98c; --log-draw: #a8b0c8; --log-reveal: #d8b4f0; --log-phase: #7c8499; --log-skip: #e3b341;
     --log-end: #ffd45e; --log-catastrophe: #ff6b6b; --log-summary: #8be0d4; --log-choice: #b9c0d4; --log-system: #9aa0b2;
@@ -216,7 +216,7 @@
   .cn { font-weight: 800; border-bottom: 2px solid var(--line); }
   .cn.t-treasure { border-color: var(--c-treasure); } .cn.t-victory { border-color: var(--c-victory); } .cn.t-curse { border-color: var(--c-curse); }
   .cn.t-special { border-color: var(--c-special); }
-  .cn.t-attack { border-color: var(--c-attack); } .cn.t-reaction { border-color: var(--c-reaction); } .cn.t-catastrophe { border-color: var(--bad); }
+  .cn.t-attack { border-color: var(--c-attack); } .cn.t-reaction { border-color: var(--c-reaction); } .cn.t-duration { border-color: var(--c-duration); } .cn.t-catastrophe { border-color: var(--bad); }
   .pn { font-weight: 800; }
   #chat-log div { padding: 1px 0; overflow-wrap: anywhere; }
   #chat-log .sys { color: var(--muted); font-style: italic; border-left: 3px solid var(--warn); padding-left: 6px; }
@@ -682,7 +682,7 @@
     return e;
   }
 
-  const TYPE_ORDER = ["catastrophe", "special", "curse", "victory", "treasure", "reaction", "attack", "action"];
+  const TYPE_ORDER = ["catastrophe", "special", "curse", "victory", "treasure", "duration", "reaction", "attack", "action"];
   function primaryType(types) {
     for (const t of TYPE_ORDER) if (types.includes(t)) return t;
     return "action";
@@ -693,7 +693,8 @@
     if (types.includes("special")) return ["special"];
     if (types.includes("curse")) return ["curse"];
     const out = [];
-    if (types.includes("action")) out.push(types.includes("attack") ? "attack" : types.includes("reaction") ? "reaction" : "action");
+    if (types.includes("duration")) out.push("duration");
+    else if (types.includes("action")) out.push(types.includes("attack") ? "attack" : types.includes("reaction") ? "reaction" : "action");
     if (types.includes("treasure")) out.push("treasure");
     if (types.includes("victory")) out.push("victory");
     return out.length ? out : ["action"];

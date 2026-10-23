@@ -89,6 +89,16 @@ class PlayerState:
     discard: list = field(default_factory=list)
     in_play: list = field(default_factory=list)
     set_aside: list = field(default_factory=list)  # for future cards (Library, Sentry...)
+    duration: list = field(default_factory=list)
+    duration_effects: list = field(default_factory=list)
+    resolved_durations: list = field(default_factory=list)
+    haven_aside: list = field(default_factory=list)
+    native_village_mat: list = field(default_factory=list)
+    island_mat: list = field(default_factory=list)
+    pirate_coins: int = 0
+    tactician_active: int = 0
+    last_turn_gained: list = field(default_factory=list)
+    gained_this_turn: list = field(default_factory=list)
     protection: int = 0                            # Guardian Angel: Attacks skip this player while > 0 (own turns left)
     protection_fresh: bool = False                 # true during the turn protection was gained (that turn is not counted)
     protected_forever: bool = False                # God Mode: protected for the rest of the game
@@ -102,7 +112,10 @@ class PlayerState:
     skip_protected: bool = False   # just had a turn skipped: cannot be skipped again until they play one
 
     def all_cards(self) -> list:
-        return [*self.deck, *self.hand, *self.discard, *self.in_play, *self.set_aside]
+        return [
+            *self.deck, *self.hand, *self.discard, *self.in_play, *self.set_aside,
+            *self.duration, *self.haven_aside, *self.native_village_mat, *self.island_mat,
+        ]
 
 
 @dataclass
@@ -153,6 +166,10 @@ class GameState:
     extra_turns: int = 0              # Possession: extra turns still to be taken after the current turn
     extra_owner: Optional[int] = None  # ... and the player who will control them
     possession_aside: list = field(default_factory=list)   # the possessed player's cards trashed this turn (they come back)
+    embargo_tokens: dict = field(default_factory=dict)
+    bought_this_turn: list = field(default_factory=list)
+    outpost_queued: bool = False
+    outpost_turn: bool = False
     resigned: list = field(default_factory=list)  # players who resigned (they cannot win)
     end_reason: Optional[str] = None  # why the game ended early (resignation / ended by host)
     winners: list = field(default_factory=list)   # player indices, set when finished

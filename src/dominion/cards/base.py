@@ -19,17 +19,13 @@ class CardType(str, Enum):
     CURSE = "curse"
     ATTACK = "attack"
     REACTION = "reaction"
+    DURATION = "duration"
     CATASTROPHE = "catastrophe"      # optional high-impact house-rule cards
     SPECIAL = "special"              # optional single-use house-rule cards that help a player
-    # Future: DURATION ...
 
 
-# An effect takes an EffectContext. It is either a plain function (no player
-# decisions) or a generator that ``yield``s Decisions and receives the answers.
 EffectFn = Callable[[Any], Any]
-# A score function receives every card name the player owns.
 ScoreFn = Callable[[Sequence[str]], int]
-# A coin function receives (GameState, player index) and returns the $ a Treasure is worth when played.
 CoinsFn = Callable[[Any, int], int]
 
 
@@ -56,6 +52,7 @@ class CardDef:
     coins_fn: Optional[CoinsFn] = None   # Treasure worth a computed number of $ (Philosopher's Stone)
     on_cleanup: Optional[EffectFn] = None  # "when you discard this from play": a generator run during cleanup
     cleanup_order: int = 0               # lower numbers are resolved first when several cards act at cleanup
+    on_next_turn: Optional[EffectFn] = None  # Seaside Duration: run at the start of the owner's next turn
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -127,21 +124,43 @@ def action(
     potion_cost: int = 0,
     on_cleanup: Optional[EffectFn] = None,
     cleanup_order: int = 0,
+    on_next_turn: Optional[EffectFn] = None,
 ) -> CardDef:
-    """An Action card. ``extra_types`` adds e.g. CardType.ATTACK / REACTION."""
+    """An Action card. ``extra_types`` adds e.g. CardType.ATTACK / REACTION / DURATION."""
     return CardDef(
         name, cost, frozenset({CardType.ACTION, *extra_types}),
         on_play=on_play, text=text, kingdom=kingdom, blocks_attack=blocks_attack,
         min_players=min_players, expansion=expansion,
         on_attack=on_attack, on_attack_min_hand=on_attack_min_hand,
         potion_cost=potion_cost, on_cleanup=on_cleanup, cleanup_order=cleanup_order,
+        on_next_turn=on_next_turn,
+    )
+
+
+def duration(
+    name: str,
+    cost: int,
+    on_play: EffectFn,
+    on_next_turn: Optional[EffectFn] = None,
+    text: str = "",
+    expansion: str = "Seaside",
+    blocks_attack: bool = False,
+    on_cleanup: Optional[EffectFn] = None,
+    cleanup_order: int = 0,
+) -> CardDef:
+    """An Action - Duration card."""
+    return CardDef(
+        name, cost, frozenset({CardType.ACTION, CardType.DURATION}),
+        on_play=on_play, on_next_turn=on_next_turn, text=text, kingdom=True,
+        blocks_attack=blocks_attack, expansion=expansion,
+        on_cleanup=on_cleanup, cleanup_order=cleanup_order,
     )
 
 
 def action_victory(
     name: str, cost: int, on_play: EffectFn, vp: int, text: str = "", expansion: str = "Base",
 ) -> CardDef:
-    """A card that is both an Action and a Victory card (Nobles, Mill)."""
+    """A card that is both an Action and a Victory card (Nobles, Mill, Island)."""
     return CardDef(
         name, cost, frozenset({CardType.ACTION, CardType.VICTORY}),
         vp=vp, on_play=on_play, text=text, kingdom=True, expansion=expansion,

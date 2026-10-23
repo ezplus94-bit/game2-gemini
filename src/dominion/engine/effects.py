@@ -240,6 +240,8 @@ class EffectContext:
         ``yield from ctx.resolve(card)``."""
         self._state.plays_this_turn += 1
         result = get_card(card).on_play(EffectContext(self._state, self.player, card))
+        if get_card(card).on_next_turn is not None and card != "Tactician":
+            self._me().duration_effects.append(card)
         if inspect.isgenerator(result):
             yield from result
 
@@ -390,6 +392,8 @@ class EffectContext:
     # ---- protection and gifts (Special cards)
     def is_protected(self, player: int) -> bool:
         p = self._state.players[player]
+        if "Lighthouse" in p.in_play or "Lighthouse" in p.duration:
+            return True
         return p.protected_forever or p.protection > 0 or p.invisible
 
     def protect(self, turns: int) -> None:
@@ -563,6 +567,123 @@ class EffectContext:
     def lock_buys(self) -> None:
         self._state.buy_locked = True
         self._state.buys = 0
+
+    # ---- Seaside helpers
+    def add_embargo(self, pile: str) -> None:
+        self._state.embargo_tokens[pile] = self._state.embargo_tokens.get(pile, 0) + 1
+        self.log(f"{self._name()} puts an Embargo token on {pile} (now {self._state.embargo_tokens[pile]}).")
+
+    def set_aside_for_haven(self, card: str) -> None:
+        zones.move_card(self._state, self.player, card, "hand", "haven_aside")
+        self.log(f"{self._name()} sets a card aside with Haven.")
+
+    def return_haven_cards(self) -> None:
+        me = self._me()
+        if me.haven_aside:
+            count = len(me.haven_aside)
+            me.hand.extend(me.haven_aside)
+            me.haven_aside.clear()
+            self.log(f"{self._name()} puts {count} Haven card(s) into their hand.", "draw")
+
+    def native_village_push(self) -> None:
+        cards = zones.take_top_cards(self._state, self.player, 1)
+        if cards:
+            self._me().native_village_mat.append(cards[0])
+            self.log(f"{self._name()} sets the top card of their deck aside on their Native Village mat.")
+
+    def native_village_take(self) -> None:
+        me = self._me()
+        if me.native_village_mat:
+            count = len(me.native_village_mat)
+            me.hand.extend(me.native_village_mat)
+            me.native_village_mat.clear()
+            self.log(f"{self._name()} puts {count} card(s) from their Native Village mat into their hand.", "draw")
+
+    def peek_bottom_of_deck(self) -> Optional[str]:
+        me = self._me()
+        if not me.deck and me.discard:
+            shuffled, me.discard = me.discard, []
+            self._state.rng.shuffle(shuffled)
+            me.deck = shuffled
+        return me.deck[0] if me.deck else None
+
+    def move_bottom_to_top(self) -> None:
+        me = self._me()
+        if me.deck:
+            card = me.deck.pop(0)
+            me.deck.append(card)
+            self.log(f"{self._name()} puts the bottom card of their deck on top.")
+
+    def in_supply(self, card: str) -> bool:
+        return card in self._state.supply
+
+    def return_hand_to_supply(self, card: str) -> None:
+        me = self._me()
+        me.hand.remove(card)
+        self._state.supply[card] += 1
+        self.log(f"{self._name()} returns {card} to the Supply.")
+
+    def smuggle_options(self) -> tuple:
+        n = len(self._state.players)
+        right = (self.player - 1) % n
+        gained = set(self._state.players[right].last_turn_gained)
+        return tuple(
+            name for name in sorted(gained)
+            if self._state.supply.get(name, 0) > 0
+            and not is_walled(self._state, name, self.player)
+            and get_card(name).potion_cost == 0
+            and self.cost_of(name) <= 6
+        )
+
+    def reveal_hand(self, player: int) -> None:
+        cards = self._state.players[player].hand
+        text = ", ".join(cards) if cards else "an empty hand"
+        self.log(f"{self._name(player)} reveals {text}.", "reveal")
+
+    def move_self_to_island(self) -> None:
+        me = self._me()
+        if self.source in me.in_play:
+            zones.move_card(self._state, self.player, self.source, "in_play", "island_mat")
+            self.log(f"{self._name()} puts {self.source} onto their Island mat.")
+
+    def move_hand_to_island(self, card: str) -> None:
+        zones.move_card(self._state, self.player, card, "hand", "island_mat")
+        self.log(f"{self._name()} puts {card} onto their Island mat.")
+
+    @property
+    def pirate_coins(self) -> int:
+        return self._me().pirate_coins
+
+    def add_pirate_coin(self) -> None:
+        self._me().pirate_coins += 1
+        self.log(f"{self._name()} takes a Coin token on Pirate Ship (now {self._me().pirate_coins}).", "gain")
+
+    def discard_top_of_deck_for(self, player: int) -> Optional[str]:
+        cards = zones.take_top_cards(self._state, player, 1)
+        if not cards:
+            return None
+        self._state.players[player].discard.append(cards[0])
+        self.log(f"{self._name(player)} discards {cards[0]} from the top of their deck.", "discard")
+        return cards[0]
+
+    def queue_outpost_turn(self) -> None:
+        if not self._state.outpost_turn and self._state.possessor is None:
+            self._state.outpost_queued = True
+            self.log(f"{self._name()} will take an Outpost extra turn (3-card hand) after this one.", "skip")
+
+    def activate_tactician(self) -> None:
+        self._me().tactician_active += 1
+        self._me().duration_effects.append("Tactician")
+
+    def consume_tactician(self) -> bool:
+        me = self._me()
+        if me.tactician_active > 0:
+            me.tactician_active -= 1
+            return True
+        return False
+
+    def bought_victory_this_turn(self) -> bool:
+        return any(get_card(c).is_type(CardType.VICTORY) for c in self._state.bought_this_turn)
 
     # ---- end-of-turn triggers
     def add_trigger(self, event: str, handler: Callable) -> None:

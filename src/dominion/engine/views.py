@@ -54,6 +54,7 @@ def build_view(game, player: int) -> dict:
             info["kingdom"] = name in s.kingdom
             info["catastrophe"] = name in s.catastrophes
             info["walled_by"] = s.walls.get(name)     # Fortnite: index of the player whose wall stands here, or None
+            info["embargo"] = s.embargo_tokens.get(name, 0)
             piles.append(info)
 
     players = []
@@ -64,6 +65,10 @@ def build_view(game, player: int) -> dict:
             "deck_count": len(p.deck),
             "discard_top": p.discard[-1] if p.discard else None,
             "in_play": list(p.in_play),
+            "duration": list(p.duration),
+            "island_mat": list(p.island_mat),
+            "native_village_count": len(p.native_village_mat),
+            "pirate_coins": p.pirate_coins,
             "turns_taken": p.turns_taken,
             "skip_pending": p.skips > 0,
             "protection": "forever" if p.protected_forever else p.protection,
