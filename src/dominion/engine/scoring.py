@@ -10,7 +10,7 @@ from .state import GameState, PlayerState
 
 def score_player(player: PlayerState) -> int:
     cards = player.all_cards()
-    return sum(get_card(c).victory_points(cards) for c in cards)
+    return sum(get_card(c).victory_points(cards) for c in cards) + player.vp_tokens
 
 
 def final_scores(state: GameState) -> list:
@@ -40,6 +40,8 @@ def vp_breakdown(player: PlayerState) -> list:
         total = count * card.victory_points(cards)
         if total != 0:
             rows.append({"card": name, "count": count, "vp": total})
+    if player.vp_tokens != 0:
+        rows.append({"card": "VP tokens", "count": player.vp_tokens, "vp": player.vp_tokens})
     rows.sort(key=lambda r: (-r["vp"], r["card"]))
     return rows
 

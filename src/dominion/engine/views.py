@@ -21,7 +21,7 @@ from .costs import card_cost
 from .scoring import final_scores, final_stats, score_player
 from .state import GameStatus
 
-BASIC_PILES = ("Copper", "Silver", "Gold", "Estate", "Duchy", "Province", "Curse", "Potion")
+BASIC_PILES = ("Copper", "Silver", "Gold", "Platinum", "Estate", "Duchy", "Province", "Colony", "Curse", "Potion")
 LOG_LINES = 200
 
 
@@ -76,6 +76,7 @@ def build_view(game, player: int) -> dict:
             "invisible": p.invisible,
             "blind": p.blind,
             "possessed_by": s.possessor if (s.possessor is not None and i == s.current_player) else None,
+            "vp_tokens": p.vp_tokens,
             "vp": score_player(p),            # deliberately public: players asked to see each other's VP
         })
 
@@ -110,6 +111,8 @@ def build_view(game, player: int) -> dict:
         "piles": piles,
         "trash": list(s.trash),
         "cost_reduction": s.cost_reduction,
+        "trade_route_tokens": len(s.trade_route_piles),
+        "contraband": list(s.contraband_banned),
         "midas": s.midas,
         "potions": s.potions,
         "has_potions": "Potion" in s.supply,

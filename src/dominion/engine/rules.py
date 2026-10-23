@@ -44,7 +44,7 @@ def acting_player(state: GameState) -> int:
 
 
 def is_game_over(state: GameState) -> bool:
-    if state.supply.get("Province", 1) == 0:
+    if state.supply.get("Province", 1) == 0 or state.supply.get("Colony", 1) == 0:
         return True
     empty = sum(
         1 for name, count in state.supply.items()
@@ -132,6 +132,10 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
             return f"The {action.card} pile is empty."
         if is_walled(state, action.card, player):
             return f"{state.players[state.walls[action.card]].name} has walled off the {action.card} pile."
+        if action.card in state.contraband_banned:
+            return f"You cannot buy {action.card} this turn (Contraband)."
+        if action.card == "Grand Market" and "Copper" in me.in_play:
+            return "You cannot buy Grand Market while you have a Copper in play."
         cost = card_cost(state, action.card)
         if cost > state.coins:
             return f"{action.card} costs ${cost} but you only have ${state.coins}."
@@ -173,7 +177,7 @@ def legal_actions(state: GameState, player: Optional[int] = None) -> list:
         result.append(PlayAllTreasures())
     if state.buys >= 1 and not state.buy_locked:
         for name in sorted(state.supply):
-            if state.supply[name] > 0 and card_cost(state, name) <= state.coins and not is_walled(state, name, actor) and state.potions >= get_card(name).potion_cost:
+            if state.supply[name] > 0 and card_cost(state, name) <= state.coins and not is_walled(state, name, actor) and state.potions >= get_card(name).potion_cost and name not in state.contraband_banned and not (name == "Grand Market" and "Copper" in me.in_play):
                 result.append(Buy(name))
     result.append(EndPhase())
     return result

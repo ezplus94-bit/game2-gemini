@@ -9,7 +9,7 @@ from typing import Optional
 from ..cards import CardType, UnknownCardError, expansions as all_expansions, get_card, kingdom_cards
 from . import zones
 from .constants import (
-    CATASTROPHE_PILE_SIZE, EMPTY_PILE_LIMIT, HAND_SIZE, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS, POTION_PILE_SIZE,
+    CATASTROPHE_PILE_SIZE, EMPTY_PILE_LIMIT, HAND_SIZE, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS, PLATINUM_PILE_SIZE, POTION_PILE_SIZE,
     STARTING_COPPERS, STARTING_ESTATES,
 )
 from .game import Game
@@ -146,6 +146,9 @@ def _build_supply(num_players: int, kingdom: list, catastrophes: list, overrides
         supply[name] = victory_count if is_victory else 10
     if any(get_card(name).potion_cost > 0 for name in kingdom):
         supply["Potion"] = POTION_PILE_SIZE              # Alchemy: the Potion pile joins the Supply
+    if any(get_card(name).expansion == "Prosperity" for name in kingdom):
+        supply["Platinum"] = PLATINUM_PILE_SIZE
+        supply["Colony"] = victory_count
     for name in catastrophes:
         supply[name] = CATASTROPHE_PILE_SIZE
     for name, count in overrides.items():

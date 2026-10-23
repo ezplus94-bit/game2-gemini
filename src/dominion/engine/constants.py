@@ -8,6 +8,7 @@ STARTING_COPPERS = 7
 STARTING_ESTATES = 3
 EMPTY_PILE_LIMIT = 3   # game ends when this many supply piles are empty
 POTION_PILE_SIZE = 16  # the Potion pile (added when a Kingdom card costs a Potion)
+PLATINUM_PILE_SIZE = 12  # Prosperity: Platinum pile size
 
 # Catastrophe cards (optional house rule): scarce, expensive, single-use
 EXODIA_PIECES = (                 # holding all five in your hand at once wins the game on the spot

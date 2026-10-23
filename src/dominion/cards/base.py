@@ -82,11 +82,12 @@ def treasure(
     potions: int = 0,
     text: Optional[str] = None,
     coins_fn: Optional[CoinsFn] = None,
+    on_play: Optional[EffectFn] = None,
     kingdom: bool = False,
     expansion: str = "Base",
 ) -> CardDef:
     return CardDef(
-        name, cost, frozenset({CardType.TREASURE}), coins=coins,
+        name, cost, frozenset({CardType.TREASURE}), coins=coins, on_play=on_play,
         text=f"${coins}" if text is None else text,
         potion_cost=potion_cost, potions=potions, coins_fn=coins_fn, kingdom=kingdom, expansion=expansion,
     )

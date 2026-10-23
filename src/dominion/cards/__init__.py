@@ -2,7 +2,7 @@ from .base import CardDef, CardType, action, action_victory, duration, treasure,
 from .registry import (
     UnknownCardError, expansions, get_card, kingdom_cards, register, unregister,
 )
-from . import basic, kingdom, alchemy, seaside  # noqa: F401  (importing these registers the cards)
+from . import basic, kingdom, alchemy, prosperity, seaside  # noqa: F401  (importing these registers the cards)
 
 __all__ = [
     "CardDef", "CardType", "action", "action_victory", "duration", "treasure", "treasure_victory", "victory",

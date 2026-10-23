@@ -89,7 +89,11 @@ def gain_card(state: GameState, player_index: int, card: str, destination: str =
     if destination not in ("discard", "hand", "deck"):
         raise ValueError(f"Unknown destination: {destination}")
     state.supply[card] -= 1
+    if get_card(card).is_type(CardType.VICTORY):
+        state.trade_route_piles.add(card)
     player = state.players[player_index]
+    if "Royal Seal" in player.in_play or "Watchtower" in player.hand:
+        state.pending_gain_reactions.append((player_index, card, destination))
     player.gained_this_turn.append(card)
     getattr(player, destination).append(card)
     player.gained.append(card)

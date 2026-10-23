@@ -67,8 +67,14 @@ class Game:
             self._play_treasure(owner, action.card)
         elif isinstance(action, PlayAllTreasures):
             for card in [c for c in self.state.players[owner].hand
-                         if get_card(c).is_type(CardType.TREASURE)]:
+                         if get_card(c).is_type(CardType.TREASURE) and get_card(c).on_play is None]:
                 self._play_treasure(owner, card)
+            if self.state.pending is None:
+                for card in [c for c in self.state.players[owner].hand
+                             if get_card(c).is_type(CardType.TREASURE)]:
+                    self._play_treasure(owner, card)
+                    if self.state.pending is not None:
+                        break
         elif isinstance(action, Buy):
             self._buy(owner, action.card)
         elif isinstance(action, EndPhase):
@@ -114,6 +120,8 @@ class Game:
         result = get_card(card).on_play(EffectContext(s, player, card))
         if inspect.isgenerator(result):
             self._advance(result, None, card)
+        elif s.pending_gain_reactions:
+            self._advance(self._gain_reaction_steps(), None, "Gain")
 
     def _play_treasure(self, player: int, card: str) -> None:
         s = self.state
@@ -132,6 +140,12 @@ class Game:
         s.log.append(f"{me.name} plays {card}{note} (+${value}{extra})." if potions
                      else f"{me.name} plays {card}{note} (+${value}).", "treasure")
         self._fire("treasure_played", player, card)
+        if definition.on_play is not None:
+            res = definition.on_play(EffectContext(s, player, card))
+            if inspect.isgenerator(res):
+                self._advance(res, None, card)
+        if s.pending is None and s.pending_gain_reactions:
+            self._advance(self._gain_reaction_steps(), None, "Gain")
 
     def _buy(self, player: int, card: str) -> None:
         s = self.state
@@ -146,6 +160,25 @@ class Game:
             s.log.append(f"{s.players[player].name} buys {card} for {s.players[taker].name} (Possession).", "buy")
         else:
             s.log.append(f"{s.players[player].name} buys {card}.", "buy")
+        me = s.players[player]
+        goons_count = me.in_play.count("Goons")
+        if goons_count:
+            s.players[taker].vp_tokens += goons_count
+            s.log.append(f"{s.players[taker].name} gets +{goons_count} VP token(s) from Goons.", "gain", 1)
+        if get_card(card).is_type(CardType.VICTORY):
+            for _ in range(me.in_play.count("Hoard")):
+                if zones.gain_card(s, player, "Gold"):
+                    s.log.append(f"{s.players[taker].name} gains Gold from Hoard.", "gain", 1)
+        elif card_cost(s, card) <= 4 and get_card(card).potion_cost == 0:
+            for _ in range(me.in_play.count("Talisman")):
+                if zones.gain_card(s, player, card):
+                    s.log.append(f"{s.players[taker].name} gains {card} from Talisman.", "gain", 1)
+        if card == "Mint":
+            for t in [c for c in list(me.in_play) if get_card(c).is_type(CardType.TREASURE)]:
+                zones.move_card(s, player, t, "in_play", "trash")
+                s.log.append(f"{me.name} trashes {t} from play (Mint).", "trash", 1)
+        if s.pending is None and s.pending_gain_reactions:
+            self._advance(self._gain_reaction_steps(), None, "Gain")
         for _ in range(s.embargo_tokens.get(card, 0)):
             if zones.gain_card(s, player, "Curse"):
                 s.log.append(f"{s.players[taker].name} gains a Curse (Embargo on {card}).", "trash", 1)
@@ -202,10 +235,37 @@ class Game:
             decision = generator.send(answer)
         except StopIteration:
             self.state.pending = None
+            if self.state.pending_gain_reactions:
+                self._advance(self._gain_reaction_steps(), None, "Gain")
             return
         if not 0 <= decision.player < len(self.state.players):
             raise ValueError(f"{source} asked an unknown player.")
         self.state.pending = PendingEffect(decision, generator, source)
+
+    def _gain_reaction_steps(self):
+        s = self.state
+        while s.pending_gain_reactions:
+            p_idx, card, dest = s.pending_gain_reactions.pop(0)
+            p = s.players[p_idx]
+            ctx = EffectContext(s, p_idx, "Royal Seal")
+            if "Royal Seal" in p.in_play and card in getattr(p, dest) and dest != "deck":
+                (ans,) = yield ctx.choose(f"Royal Seal: put gained {card} onto your deck?", ("Put on deck", "Leave it"))
+                if ans == "Put on deck":
+                    zones.move_card(s, p_idx, card, dest, "deck")
+                    s.log.append(f"{p.name} puts {card} onto their deck with Royal Seal.", "reveal", 1)
+                    dest = "deck"
+            if "Watchtower" in p.hand and card in getattr(p, dest):
+                wctx = EffectContext(s, p_idx, "Watchtower")
+                (ans,) = yield wctx.choose(
+                    f"Watchtower: reveal Watchtower for gained {card}?",
+                    ("Trash it", "Put on deck", "Do nothing"),
+                )
+                if ans == "Trash it":
+                    zones.move_card(s, p_idx, card, dest, "trash")
+                    s.log.append(f"{p.name} reveals Watchtower and trashes {card}.", "trash", 1)
+                elif ans == "Put on deck" and dest != "deck":
+                    zones.move_card(s, p_idx, card, dest, "deck")
+                    s.log.append(f"{p.name} reveals Watchtower and puts {card} onto their deck.", "reveal", 1)
 
     def _cleanup(self, player: int) -> None:
         """End of turn. It runs as a generator so a card may ask its owner something first (Herbalist, Alchemist);
@@ -259,6 +319,8 @@ class Game:
         s.cost_reduction = 0
         s.plays_this_turn = 0
         s.midas = False
+        s.contraband_banned.clear()
+        s.pending_gain_reactions.clear()
         if me.blind > 0:
             me.blind -= 1
             if me.blind == 0:

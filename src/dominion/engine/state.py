@@ -107,6 +107,7 @@ class PlayerState:
     blind: int = 0                                 # Roofie: turns left in which this player cannot read cards
     bought: list = field(default_factory=list)     # every card this player bought (stats)
     gained: list = field(default_factory=list)     # every card this player gained, bought or not (stats)
+    vp_tokens: int = 0
     turns_taken: int = 0
     skips: int = 0                 # turns this player will skip
     skip_protected: bool = False   # just had a turn skipped: cannot be skipped again until they play one
@@ -166,6 +167,9 @@ class GameState:
     extra_turns: int = 0              # Possession: extra turns still to be taken after the current turn
     extra_owner: Optional[int] = None  # ... and the player who will control them
     possession_aside: list = field(default_factory=list)   # the possessed player's cards trashed this turn (they come back)
+    contraband_banned: list = field(default_factory=list)
+    trade_route_piles: set = field(default_factory=set)
+    pending_gain_reactions: list = field(default_factory=list)
     embargo_tokens: dict = field(default_factory=dict)
     bought_this_turn: list = field(default_factory=list)
     outpost_queued: bool = False

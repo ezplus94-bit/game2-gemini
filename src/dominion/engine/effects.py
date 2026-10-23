@@ -685,6 +685,48 @@ class EffectContext:
     def bought_victory_this_turn(self) -> bool:
         return any(get_card(c).is_type(CardType.VICTORY) for c in self._state.bought_this_turn)
 
+    # ---- Prosperity helpers
+    def add_vp_tokens(self, n: int, player: Optional[int] = None) -> None:
+        i = self.player if player is None else player
+        self._state.players[i].vp_tokens += n
+        self.log(f"{self._name(i)} gets +{n} VP token(s) (now {self._state.players[i].vp_tokens}).", "gain")
+
+    @property
+    def trade_route_tokens(self) -> int:
+        return len(self._state.trade_route_piles)
+
+    def ban_contraband(self, card: str) -> None:
+        if card not in self._state.contraband_banned:
+            self._state.contraband_banned.append(card)
+        self.log(f"{self._name()} cannot buy {card} this turn (Contraband).", "reveal")
+
+    def take_discard_to_hand(self, card: str) -> None:
+        zones.move_card(self._state, self.player, card, "discard", "hand")
+        self.log(f"{self._name()} puts {card} from their discard pile into their hand.", "draw")
+
+    def play_set_aside_treasure(self, card: str):
+        s = self._state
+        me = self._me()
+        zones.move_card(s, self.player, card, "set_aside", "in_play")
+        definition = get_card(card)
+        value = definition.coins_fn(s, self.player) if definition.coins_fn is not None else definition.coins
+        potions = definition.potions
+        note = ""
+        if s.midas and value < 3:
+            value, potions, note = 3, 0, " as Gold"
+        s.coins += value
+        s.potions += potions
+        extra = f", +{potions} Potion" if potions else ""
+        self.log(f"{me.name} plays {card}{note} with {self.source} (+${value}{extra})." if potions
+                 else f"{me.name} plays {card}{note} with {self.source} (+${value}).", "treasure")
+        for trigger in list(s.triggers):
+            if trigger.event == "treasure_played" and trigger.owner == self.player:
+                trigger.handler(EffectContext(s, self.player, trigger.source), trigger, card)
+        if definition.on_play is not None:
+            res = definition.on_play(EffectContext(s, self.player, card))
+            if inspect.isgenerator(res):
+                yield from res
+
     # ---- end-of-turn triggers
     def add_trigger(self, event: str, handler: Callable) -> None:
         self._state.triggers.append(Trigger(event, self.source, handler, self.player))
