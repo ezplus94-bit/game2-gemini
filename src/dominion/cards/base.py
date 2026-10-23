@@ -53,6 +53,7 @@ class CardDef:
     on_cleanup: Optional[EffectFn] = None  # "when you discard this from play": a generator run during cleanup
     cleanup_order: int = 0               # lower numbers are resolved first when several cards act at cleanup
     on_next_turn: Optional[EffectFn] = None  # Seaside Duration: run at the start of the owner's next turn
+    on_overpay: Optional[Callable] = None    # Guilds: run when the buyer overpays for this card
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -85,11 +86,13 @@ def treasure(
     on_play: Optional[EffectFn] = None,
     kingdom: bool = False,
     expansion: str = "Base",
+    on_overpay: Optional[Callable] = None,
 ) -> CardDef:
     return CardDef(
         name, cost, frozenset({CardType.TREASURE}), coins=coins, on_play=on_play,
         text=f"${coins}" if text is None else text,
         potion_cost=potion_cost, potions=potions, coins_fn=coins_fn, kingdom=kingdom, expansion=expansion,
+        on_overpay=on_overpay,
     )
 
 
@@ -126,6 +129,7 @@ def action(
     on_cleanup: Optional[EffectFn] = None,
     cleanup_order: int = 0,
     on_next_turn: Optional[EffectFn] = None,
+    on_overpay: Optional[Callable] = None,
 ) -> CardDef:
     """An Action card. ``extra_types`` adds e.g. CardType.ATTACK / REACTION / DURATION."""
     return CardDef(
@@ -134,7 +138,7 @@ def action(
         min_players=min_players, expansion=expansion,
         on_attack=on_attack, on_attack_min_hand=on_attack_min_hand,
         potion_cost=potion_cost, on_cleanup=on_cleanup, cleanup_order=cleanup_order,
-        on_next_turn=on_next_turn,
+        on_next_turn=on_next_turn, on_overpay=on_overpay,
     )
 
 

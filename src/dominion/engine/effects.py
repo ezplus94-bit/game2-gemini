@@ -83,6 +83,57 @@ class EffectContext:
     def is_treasure(self, card: str) -> bool:
         return get_card(card).is_type(CardType.TREASURE)
 
+    def is_curse(self, card: str) -> bool:
+        return get_card(card).is_type(CardType.CURSE)
+
+    @property
+    def unused_actions(self) -> int:
+        return self._state.actions
+
+    @property
+    def coffers(self) -> int:
+        return self._me().coffers
+
+    def add_coffers(self, n: int, player: Optional[int] = None) -> None:
+        i = self.player if player is None else player
+        self._state.players[i].coffers += n
+        self.log(f"{self._name(i)} gets +{n} Coffer(s) (now {self._state.players[i].coffers}).", "gain")
+
+    def remove_coffers(self, n: int) -> None:
+        self._me().coffers -= n
+        self.log(f"{self._name()} spends {n} Coffer(s) (now {self._me().coffers}).")
+
+    @property
+    def bane_card(self) -> Optional[str]:
+        return self._state.bane_card
+
+    @property
+    def available_prizes(self) -> tuple:
+        return tuple(self._state.prizes)
+
+    def gain_prize(self, card: str, destination: str = "deck") -> bool:
+        ok = zones.gain_prize(self._state, self.player, card, destination)
+        if ok:
+            taker = zones.beneficiary(self._state, self.player)
+            if taker != self.player:
+                self.log(f"{self._name(taker)} gains Prize {card} (Possession).", "gain")
+            else:
+                where = "" if destination == "discard" else f" to their {destination}"
+                self.log(f"{self._name()} gains Prize {card}{where}.", "gain")
+        return ok
+
+    def set_aside_horse_traders(self) -> None:
+        if "Horse Traders" in self._me().hand:
+            zones.move_card(self._state, self.player, "Horse Traders", "hand", "horse_traders_aside")
+            self.log(f"{self._name()} sets Horse Traders aside.")
+
+    def put_deck_into_discard(self) -> None:
+        me = self._me()
+        count = len(me.deck)
+        me.discard.extend(me.deck)
+        me.deck.clear()
+        self.log(f"{self._name()} puts their deck ({count} card(s)) into their discard pile.", "discard")
+
     def gainable(self, max_cost: int, card_type: Optional[CardType] = None, exact: bool = False,
                  gainer: Optional[int] = None) -> tuple:
         """Supply piles that are non-empty, not walled off against ``gainer`` (default: this player), cost at

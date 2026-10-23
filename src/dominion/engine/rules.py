@@ -17,7 +17,7 @@ from typing import Optional
 
 from ..cards import CardType, get_card
 from .actions import (
-    Action, Buy, Cheat, Choose, Decision, EndGame, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, Resign,
+    Action, Buy, Cheat, Choose, Decision, EndGame, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, Resign, SpendCoffer,
 )
 from .constants import CHEAT_KINDS
 from .costs import card_cost, is_walled
@@ -119,6 +119,13 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
             return "You have no Treasures in hand."
         return None
 
+    if isinstance(action, SpendCoffer):
+        if state.phase is not Phase.BUY:
+            return "Coffers can only be spent during the Buy phase."
+        if me.coffers < 1:
+            return "You have no Coffers to spend."
+        return None
+
     if isinstance(action, Buy):
         if state.phase is not Phase.BUY:
             return "You can only buy during the Buy phase."
@@ -175,6 +182,8 @@ def legal_actions(state: GameState, player: Optional[int] = None) -> list:
         result.append(PlayTreasure(card))
     if treasures:
         result.append(PlayAllTreasures())
+    if me.coffers >= 1:
+        result.append(SpendCoffer())
     if state.buys >= 1 and not state.buy_locked:
         for name in sorted(state.supply):
             if state.supply[name] > 0 and card_cost(state, name) <= state.coins and not is_walled(state, name, actor) and state.potions >= get_card(name).potion_cost and name not in state.contraband_banned and not (name == "Grand Market" and "Copper" in me.in_play):

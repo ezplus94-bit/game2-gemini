@@ -1171,6 +1171,7 @@
     };
     pill("Actions", v.actions); pill("Buys", v.buys); pill("Coins", "$" + v.coins, "coins"); pill("Turn", v.turn_number);
     if (v.has_potions) pill("Potions", v.potions, "coins");
+    if (me.coffers > 0) pill("Coffers", me.coffers, "coins");
     if (v.cost_reduction > 0) pill("Cards cost", "-$" + v.cost_reduction, "reduced");
     if (v.midas) pill("Midas Touch", "Treasures = $3", "coins");
     if (isBlind()) pill("Blinded", "types only", "reduced");
@@ -1199,6 +1200,7 @@
       if (p.skip_pending) tags.appendChild(el("span", "tag bad", "skips next turn"));
       if (p.protection === "forever") tags.appendChild(el("span", "tag gold", "protected: God Mode"));
       else if (p.protection > 0) tags.appendChild(el("span", "tag gold", "protected: " + p.protection + " turn" + (p.protection > 1 ? "s" : "")));
+      if (p.coffers > 0) tags.appendChild(el("span", "tag gold", "Coffers: " + p.coffers));
       if (p.bonus_coins > 0) tags.appendChild(el("span", "tag good", "gets $" + p.bonus_coins + " next turn"));
       if (p.invisible) tags.appendChild(el("span", "tag gold", "invisible"));
       if (p.possessed_by !== null && p.possessed_by !== undefined) tags.appendChild(el("span", "tag bad", "possessed by " + v.players[p.possessed_by].name));

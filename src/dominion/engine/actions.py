@@ -29,6 +29,11 @@ class PlayAllTreasures:
 
 
 @dataclass(frozen=True)
+class SpendCoffer:
+    """Spend one Coffer token for +$1 (Buy phase)."""
+
+
+@dataclass(frozen=True)
 class Buy:
     """Buy a card from the supply (Buy phase)."""
     card: str
@@ -66,7 +71,7 @@ class Cheat:
     kind: str
 
 
-Action = Union[PlayAction, PlayTreasure, PlayAllTreasures, Buy, EndPhase, Choose, Resign, EndGame, Cheat]
+Action = Union[PlayAction, PlayTreasure, PlayAllTreasures, SpendCoffer, Buy, EndPhase, Choose, Resign, EndGame, Cheat]
 
 
 @dataclass(frozen=True)

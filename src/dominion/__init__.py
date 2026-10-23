@@ -4,7 +4,7 @@ from .cards.base import CardDef, CardType, action, action_victory, duration, tre
 from .cards.registry import (
     UnknownCardError, expansions, get_card, kingdom_cards, register, unregister,
 )
-from .cards import basic, kingdom, prosperity, alchemy, seaside  # noqa: F401  (importing these registers the cards)
+from .cards import basic, kingdom, prosperity, alchemy, seaside, Cornucopia  # noqa: F401  (importing these registers the cards)
 
 __version__ = "0.12.0"
 

@@ -10,7 +10,7 @@ def _prosperity_reduction(state: GameState, name: str) -> int:
     if not state.players:
         return 0
     in_play = state.players[state.current_player].in_play
-    extra = 0
+    extra = 2 * in_play.count("Princess")
     card = get_card(name)
     if card.is_type(CardType.ACTION):
         extra += 2 * in_play.count("Quarry")

@@ -44,7 +44,7 @@ def test_seaside_has_26_cards():
 
 def test_caravan_draws_now_and_at_start_of_next_turn():
     g = sg(cards=("Caravan",))
-    set_zones(g, 0, hand=["Caravan"], deck=["Copper"] * 10)
+    set_zones(g, 0, hand=["Caravan"], deck=["Copper"] * 15)
     play(g, "Caravan")
     assert len(g.state.players[0].hand) == 1 and g.state.actions == 1
     end_turn(g)

@@ -18,7 +18,7 @@ from ..ai import BigMoneyBot, run_game
 from ..cards import get_card
 from ..engine import (
     Buy, Choose, EndPhase, Game, GameConfig, GameStatus, IllegalActionError,
-    Phase, PlayAction, PlayAllTreasures, PlayTreasure, final_scores, new_game,
+    Phase, PlayAction, PlayAllTreasures, PlayTreasure, SpendCoffer, final_scores, new_game,
 )
 
 
@@ -47,7 +47,7 @@ def render_state(game: Game) -> str:
     lines = [
         "",
         f"=== Turn {s.turn_number}: {current.name} - {s.phase.value.upper()} phase ===",
-        f"Actions: {s.actions}   Buys: {s.buys}   Coins: ${s.coins}",
+        f"Actions: {s.actions}   Buys: {s.buys}   Coins: ${s.coins}" + (f"   Coffers: {current.coffers}" if current.coffers else ""),
         "Supply: " + "  ".join(
             f"{name} ${get_card(name).cost} x{count}"
             for name, count in sorted(s.supply.items(), key=lambda kv: (get_card(kv[0]).cost, kv[0]))
@@ -67,6 +67,8 @@ def describe_action(action) -> str:
         return f"Play {action.card}"
     if isinstance(action, PlayAllTreasures):
         return "Play all Treasures"
+    if isinstance(action, SpendCoffer):
+        return "Spend a Coffer (+$1)"
     if isinstance(action, Buy):
         return f"Buy {action.card} (${get_card(action.card).cost})"
     if isinstance(action, EndPhase):

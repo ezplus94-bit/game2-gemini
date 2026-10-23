@@ -33,7 +33,7 @@ def to_buy_phase(game):
 def total_cards(game):
     """Every card in the game: supply + trash + all player zones (+ cards set aside by Possession)."""
     s = game.state
-    return sum(s.supply.values()) + len(s.trash) + len(s.possession_aside) + sum(len(p.all_cards()) for p in s.players)
+    return sum(s.supply.values()) + len(s.trash) + len(s.possession_aside) + len(s.prizes) + sum(len(p.all_cards()) for p in s.players)
 
 
 def snapshot(game):

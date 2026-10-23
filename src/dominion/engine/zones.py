@@ -10,7 +10,7 @@ from .costs import is_walled
 from .state import GameState
 
 # Zones a card can be moved between. "trash" is shared; the rest are per player.
-PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "duration", "haven_aside", "native_village_mat", "island_mat")
+PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "duration", "haven_aside", "native_village_mat", "island_mat", "horse_traders_aside")
 
 
 def beneficiary(state: GameState, player_index: int) -> int:
@@ -91,6 +91,25 @@ def gain_card(state: GameState, player_index: int, card: str, destination: str =
     state.supply[card] -= 1
     if get_card(card).is_type(CardType.VICTORY):
         state.trade_route_piles.add(card)
+    player = state.players[player_index]
+    if "Royal Seal" in player.in_play or "Watchtower" in player.hand:
+        state.pending_gain_reactions.append((player_index, card, destination))
+    player.gained_this_turn.append(card)
+    getattr(player, destination).append(card)
+    player.gained.append(card)
+    return True
+
+
+def gain_prize(state: GameState, player_index: int, card: str, destination: str = "deck") -> bool:
+    """Move a Prize card from state.prizes to a player's zone."""
+    if card not in state.prizes:
+        return False
+    taker = beneficiary(state, player_index)
+    if taker != player_index:
+        player_index, destination = taker, "discard"
+    if destination not in ("discard", "hand", "deck"):
+        raise ValueError(f"Unknown destination: {destination}")
+    state.prizes.remove(card)
     player = state.players[player_index]
     if "Royal Seal" in player.in_play or "Watchtower" in player.hand:
         state.pending_gain_reactions.append((player_index, card, destination))

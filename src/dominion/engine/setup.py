@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from ..cards import CardType, UnknownCardError, expansions as all_expansions, get_card, kingdom_cards
+from ..cards.Cornucopia import PRIZES
 from . import zones
 from .constants import (
     CATASTROPHE_PILE_SIZE, EMPTY_PILE_LIMIT, HAND_SIZE, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS, PLATINUM_PILE_SIZE, POTION_PILE_SIZE,
@@ -26,6 +27,7 @@ class GameConfig:
     catastrophes: list = field(default_factory=list)   # 0-2 Catastrophe cards to add (optional house rule)
     expansions: Optional[list] = None     # card sets a RANDOM Kingdom is drawn from; None = every set
     cheats: bool = False                  # allow cheat codes (+100 coins / actions / buys) in this game
+    bane_card: Optional[str] = None       # Cornucopia: Young Witch's Bane card pile
 
 
 def new_game(config: GameConfig) -> Game:
@@ -38,20 +40,24 @@ def new_game(config: GameConfig) -> Game:
     seed = config.seed if config.seed is not None else random.SystemRandom().randrange(2**32)
     expansions = _resolve_expansions(config.expansions)
     kingdom = _resolve_kingdom(config.kingdom, seed, expansions)
+    bane_card = _resolve_bane(config.bane_card, kingdom, seed) if "Young Witch" in kingdom else None
     catastrophes = _resolve_catastrophes(config.catastrophes, len(names))
     fenced = _with_companions(catastrophes)
-    supply = _build_supply(len(names), kingdom, fenced, config.supply_overrides)
+    supply = _build_supply(len(names), kingdom, fenced, config.supply_overrides, bane_card=bane_card)
+    prizes = list(PRIZES) if "Tournament" in kingdom else []
 
     rng = random.Random(seed)
     players = []
+    initial_coffers = 1 if "Baker" in kingdom else 0
     for name in names:
         deck = ["Copper"] * STARTING_COPPERS + ["Estate"] * STARTING_ESTATES
         rng.shuffle(deck)
-        players.append(PlayerState(name=name, deck=deck))
+        players.append(PlayerState(name=name, deck=deck, coffers=initial_coffers))
 
     state = GameState(
         players=players, supply=supply, kingdom=tuple(kingdom), rng=rng,
         empty_pile_limit=EMPTY_PILE_LIMIT, catastrophes=tuple(fenced), cheats=bool(config.cheats),
+        prizes=prizes, bane_card=bane_card,
     )
     for i in range(len(players)):
         zones.draw_cards(state, i, HAND_SIZE)
@@ -62,7 +68,7 @@ def new_game(config: GameConfig) -> Game:
     state.log.append(f"{players[state.current_player].name} goes first.", "system")
     state.log.append(f"Turn 1 - {players[state.current_player].name}", "turn")
 
-    resolved = replace(config, seed=seed, kingdom=list(kingdom), catastrophes=list(catastrophes), expansions=expansions)
+    resolved = replace(config, seed=seed, kingdom=list(kingdom), catastrophes=list(catastrophes), expansions=expansions, bane_card=bane_card)
     return Game(state, resolved)
 
 
@@ -130,7 +136,21 @@ def _with_companions(picked: list) -> list:
     return out
 
 
-def _build_supply(num_players: int, kingdom: list, catastrophes: list, overrides: dict) -> dict:
+def _resolve_bane(requested: Optional[str], kingdom: list, seed: int) -> str:
+    if requested is not None:
+        card = get_card(requested)
+        if not card.kingdom or card.cost not in (2, 3) or card.potion_cost != 0:
+            raise ValueError(f"{requested} cannot be a Bane card (must be a $2 or $3 Kingdom card).")
+        return requested
+    candidates = [
+        name for name in kingdom_cards()
+        if name not in kingdom and get_card(name).cost in (2, 3)
+        and get_card(name).potion_cost == 0 and get_card(name).expansion != "Prosperity"
+    ]
+    return random.Random(seed ^ 0xBA4E).choice(candidates)
+
+
+def _build_supply(num_players: int, kingdom: list, catastrophes: list, overrides: dict, bane_card: Optional[str] = None) -> dict:
     victory_count = 8 if num_players == 2 else 12
     supply = {
         "Copper": 60 - STARTING_COPPERS * num_players,
@@ -144,6 +164,9 @@ def _build_supply(num_players: int, kingdom: list, catastrophes: list, overrides
     for name in kingdom:
         is_victory = get_card(name).is_type(CardType.VICTORY)
         supply[name] = victory_count if is_victory else 10
+    if bane_card is not None and bane_card not in supply:
+        is_victory = get_card(bane_card).is_type(CardType.VICTORY)
+        supply[bane_card] = victory_count if is_victory else 10
     if any(get_card(name).potion_cost > 0 for name in kingdom):
         supply["Potion"] = POTION_PILE_SIZE              # Alchemy: the Potion pile joins the Supply
     if any(get_card(name).expansion == "Prosperity" for name in kingdom):

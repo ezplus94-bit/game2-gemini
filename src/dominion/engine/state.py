@@ -95,6 +95,8 @@ class PlayerState:
     haven_aside: list = field(default_factory=list)
     native_village_mat: list = field(default_factory=list)
     island_mat: list = field(default_factory=list)
+    horse_traders_aside: list = field(default_factory=list)
+    coffers: int = 0
     pirate_coins: int = 0
     tactician_active: int = 0
     last_turn_gained: list = field(default_factory=list)
@@ -116,6 +118,7 @@ class PlayerState:
         return [
             *self.deck, *self.hand, *self.discard, *self.in_play, *self.set_aside,
             *self.duration, *self.haven_aside, *self.native_village_mat, *self.island_mat,
+            *self.horse_traders_aside,
         ]
 
 
@@ -174,6 +177,8 @@ class GameState:
     bought_this_turn: list = field(default_factory=list)
     outpost_queued: bool = False
     outpost_turn: bool = False
+    prizes: list = field(default_factory=list)
+    bane_card: Optional[str] = None
     resigned: list = field(default_factory=list)  # players who resigned (they cannot win)
     end_reason: Optional[str] = None  # why the game ended early (resignation / ended by host)
     winners: list = field(default_factory=list)   # player indices, set when finished

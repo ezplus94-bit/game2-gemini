@@ -14,6 +14,7 @@ player who must answer. During a Possession turn the possessor also sees the pos
 from __future__ import annotations
 
 from ..cards import get_card
+from ..cards.Cornucopia import PRIZES
 from .actions import Choose
 from .codec import action_to_dict
 from .rules import legal_actions
@@ -46,12 +47,14 @@ def build_view(game, player: int) -> dict:
     acting = game.acting_player              # whoever the game waits for (the possessor, under Possession)
 
     piles = []
-    for name in [*BASIC_PILES, *s.kingdom, *s.catastrophes]:
+    extra_bane = [s.bane_card] if (s.bane_card and s.bane_card not in s.kingdom) else []
+    for name in [*BASIC_PILES, *s.kingdom, *extra_bane, *s.catastrophes]:
         if name in s.supply:
             info = card_info(name)
             info["count"] = s.supply[name]
             info["price"] = card_cost(s, name)       # what it costs right now (Bridge)
             info["kingdom"] = name in s.kingdom
+            info["bane"] = name == s.bane_card
             info["catastrophe"] = name in s.catastrophes
             info["walled_by"] = s.walls.get(name)     # Fortnite: index of the player whose wall stands here, or None
             info["embargo"] = s.embargo_tokens.get(name, 0)
@@ -76,6 +79,8 @@ def build_view(game, player: int) -> dict:
             "invisible": p.invisible,
             "blind": p.blind,
             "possessed_by": s.possessor if (s.possessor is not None and i == s.current_player) else None,
+            "coffers": p.coffers,
+            "horse_traders_aside": len(p.horse_traders_aside),
             "vp_tokens": p.vp_tokens,
             "vp": score_player(p),            # deliberately public: players asked to see each other's VP
         })
@@ -102,7 +107,7 @@ def build_view(game, player: int) -> dict:
     else:
         legal = [action_to_dict(a) for a in legal_actions(s, player) if not isinstance(a, Choose)]
 
-    names = {name for name in s.supply}
+    names = {name for name in s.supply} | set(PRIZES)
     view = {
         "status": s.status.value,
         "version": len(game.history),     # increases with every applied action
@@ -112,6 +117,8 @@ def build_view(game, player: int) -> dict:
         "trash": list(s.trash),
         "cost_reduction": s.cost_reduction,
         "trade_route_tokens": len(s.trade_route_piles),
+        "prizes": list(s.prizes),
+        "bane_card": s.bane_card,
         "contraband": list(s.contraband_banned),
         "midas": s.midas,
         "potions": s.potions,

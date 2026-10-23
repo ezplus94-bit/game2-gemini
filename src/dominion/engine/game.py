@@ -19,7 +19,7 @@ from typing import Optional
 from ..cards import CardType, get_card
 from . import zones
 from .actions import (
-    Action, Buy, Cheat, Choose, EndGame, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, Resign,
+    Action, Buy, Cheat, Choose, EndGame, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, Resign, SpendCoffer,
 )
 from .constants import CHEAT_AMOUNT, EXODIA_PIECES, HAND_SIZE
 from .costs import card_cost
@@ -75,6 +75,8 @@ class Game:
                     self._play_treasure(owner, card)
                     if self.state.pending is not None:
                         break
+        elif isinstance(action, SpendCoffer):
+            self._spend_coffer(owner)
         elif isinstance(action, Buy):
             self._buy(owner, action.card)
         elif isinstance(action, EndPhase):
@@ -147,6 +149,13 @@ class Game:
         if s.pending is None and s.pending_gain_reactions:
             self._advance(self._gain_reaction_steps(), None, "Gain")
 
+    def _spend_coffer(self, player: int) -> None:
+        s = self.state
+        me = s.players[player]
+        me.coffers -= 1
+        s.coins += 1
+        s.log.append(f"{me.name} spends a Coffer (+$1, {me.coffers} left).", "treasure")
+
     def _buy(self, player: int, card: str) -> None:
         s = self.state
         s.coins -= card_cost(s, card)
@@ -165,6 +174,10 @@ class Game:
         if goons_count:
             s.players[taker].vp_tokens += goons_count
             s.log.append(f"{s.players[taker].name} gets +{goons_count} VP token(s) from Goons.", "gain", 1)
+        mg_count = me.in_play.count("Merchant Guild")
+        if mg_count:
+            s.players[taker].coffers += mg_count
+            s.log.append(f"{s.players[taker].name} gets +{mg_count} Coffer(s) from Merchant Guild.", "gain", 1)
         if get_card(card).is_type(CardType.VICTORY):
             for _ in range(me.in_play.count("Hoard")):
                 if zones.gain_card(s, player, "Gold"):
@@ -177,11 +190,13 @@ class Game:
             for t in [c for c in list(me.in_play) if get_card(c).is_type(CardType.TREASURE)]:
                 zones.move_card(s, player, t, "in_play", "trash")
                 s.log.append(f"{me.name} trashes {t} from play (Mint).", "trash", 1)
-        if s.pending is None and s.pending_gain_reactions:
-            self._advance(self._gain_reaction_steps(), None, "Gain")
         for _ in range(s.embargo_tokens.get(card, 0)):
             if zones.gain_card(s, player, "Curse"):
                 s.log.append(f"{s.players[taker].name} gains a Curse (Embargo on {card}).", "trash", 1)
+        if get_card(card).on_overpay is not None and s.coins > 0:
+            self._advance(self._overpay_steps(player, card), None, card)
+        elif s.pending is None and s.pending_gain_reactions:
+            self._advance(self._gain_reaction_steps(), None, "Gain")
 
     def _cheat(self, player: int, kind: str) -> None:
         s = self.state
@@ -241,6 +256,28 @@ class Game:
         if not 0 <= decision.player < len(self.state.players):
             raise ValueError(f"{source} asked an unknown player.")
         self.state.pending = PendingEffect(decision, generator, source)
+
+    def _overpay_steps(self, player: int, card: str):
+        s = self.state
+        if s.pending_gain_reactions:
+            yield from self._gain_reaction_steps()
+        if s.coins <= 0:
+            return
+        ctx = EffectContext(s, player, card)
+        options = tuple(f"${n}" for n in range(1, s.coins + 1))
+        chosen = yield ctx.choose(
+            f"{card}: you may overpay up to ${s.coins} (select nothing for $0).",
+            options, 0, 1,
+        )
+        if chosen:
+            amount = int(chosen[0].lstrip("$"))
+            s.coins -= amount
+            s.log.append(f"{s.players[player].name} overpays ${amount} for {card}.", "buy", 1)
+            res = get_card(card).on_overpay(ctx, amount)
+            if inspect.isgenerator(res):
+                yield from res
+            if s.pending_gain_reactions:
+                yield from self._gain_reaction_steps()
 
     def _gain_reaction_steps(self):
         s = self.state
@@ -342,6 +379,12 @@ class Game:
     def _resolve_start_of_turn_durations(self, player: int) -> None:
         s = self.state
         me = s.players[player]
+        if me.horse_traders_aside:
+            ht_count = len(me.horse_traders_aside)
+            me.hand.extend(me.horse_traders_aside)
+            me.horse_traders_aside.clear()
+            zones.draw_cards(s, player, ht_count)
+            s.log.append(f"{me.name} returns {ht_count} Horse Traders to hand and draws {ht_count} card(s).", "draw", 1)
         active_cards = list(me.duration)
         me.duration.clear()
         for card in active_cards:

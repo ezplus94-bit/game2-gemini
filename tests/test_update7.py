@@ -367,8 +367,8 @@ def test_host_chooses_card_sets_in_the_lobby():
         m = RoomManager(bot_delay=0)
         host, guest, _ = await two_player_room(m)
         lobby = host.last("lobby")
-        assert lobby["expansions"] == ["Base", "Alchemy", "Intrigue", "Prosperity", "Seaside"] and lobby["available_expansions"] == ["Base", "Alchemy", "Intrigue", "Prosperity", "Seaside"]
-        assert {c["expansion"] for c in lobby["available"]} == {"Base", "Alchemy", "Intrigue", "Prosperity", "Seaside"} and len(lobby["available"]) == 115
+        assert lobby["expansions"] == ["Base", "Alchemy", "Cornucopia", "Intrigue", "Prosperity", "Seaside"] and lobby["available_expansions"] == ["Base", "Alchemy", "Cornucopia", "Intrigue", "Prosperity", "Seaside"]
+        assert {c["expansion"] for c in lobby["available"]} == {"Base", "Alchemy", "Cornucopia", "Intrigue", "Prosperity", "Seaside"} and len(lobby["available"]) == 141
         await guest.say(type="set_expansions", expansions=["Base"])
         assert guest.last_error() == "Only the host can do that."
         for bad in ([], ["Nope"], ["Base", "Base"], "Base", None, [1], ["Base", "Nope"]):

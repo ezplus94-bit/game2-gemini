@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .actions import Action, Buy, Choose, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure
+from .actions import Action, Buy, Choose, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, SpendCoffer
 
 MAX_SELECTION = 50
 MAX_NAME_LENGTH = 60
@@ -22,6 +22,8 @@ def action_to_dict(action: Action) -> dict:
         return {"type": "play_treasure", "card": action.card}
     if isinstance(action, PlayAllTreasures):
         return {"type": "play_all_treasures"}
+    if isinstance(action, SpendCoffer):
+        return {"type": "spend_coffer"}
     if isinstance(action, Buy):
         return {"type": "buy", "card": action.card}
     if isinstance(action, EndPhase):
@@ -48,6 +50,8 @@ def action_from_dict(data: Any) -> Action:
         return PlayTreasure(_card_name(data))
     if kind == "play_all_treasures":
         return PlayAllTreasures()
+    if kind == "spend_coffer":
+        return SpendCoffer()
     if kind == "buy":
         return Buy(_card_name(data))
     if kind == "end_phase":

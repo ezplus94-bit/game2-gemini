@@ -30,7 +30,7 @@ from ..ai import BigMoneyBot
 from ..cards import expansions as all_expansions, kingdom_cards
 from ..cards.registry import fenced_cards
 from ..engine import (
-    Buy, Cheat, Choose, EndGame, EndPhase, Resign, GameConfig, GameStatus, IllegalActionError, PlayAction,
+    Buy, Cheat, Choose, EndGame, EndPhase, Resign, SpendCoffer, GameConfig, GameStatus, IllegalActionError, PlayAction,
     PlayAllTreasures, PlayTreasure, action_from_dict, build_view, new_game, replay,
 )
 from ..engine.constants import CHEAT_PHRASES, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS
@@ -753,6 +753,8 @@ def _describe_action(action) -> str:
         return f"play {action.card}"
     if isinstance(action, PlayAllTreasures):
         return "play all Treasures"
+    if isinstance(action, SpendCoffer):
+        return "spend a Coffer"
     if isinstance(action, Buy):
         return f"buy {action.card}"
     if isinstance(action, EndPhase):
