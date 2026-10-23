@@ -1,0 +1,6 @@
+{
+  "name": "dominion-layout-tests",
+  "private": true,
+  "description": "Optional: renders the real page in headless Chromium at several screen sizes and checks that the page itself never scrolls.",
+  "dependencies": { "@sparticuz/chromium": "^138.0.0", "puppeteer-core": "^24.0.0" }
+}
