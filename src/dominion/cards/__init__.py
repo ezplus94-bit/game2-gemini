@@ -1,4 +1,6 @@
-from .base import CardDef, CardType, action, action_victory, duration, treasure, treasure_victory, victory
+from .base import (
+    CardDef, CardType, action, action_victory, duration, treasure, treasure_victory, victory,
+)
 from .registry import (
     UnknownCardError, expansions, get_card, kingdom_cards, register, unregister,
 )
@@ -63,14 +65,27 @@ except Exception:
     pass
 
 # --- Guilds (2013 / 2024 2E) Card Registration ---
-from dominion.cards.guilds import (
-    GUILDS_CARD_SPECS,
-    GUILDS_KINGDOM_CARDS_1E,
-    GUILDS_KINGDOM_CARDS_2E,
-    CORNUCOPIA_GUILDS_2E_NEW_KINGDOM_CARDS,
-    REWARDS,
-    OVERPAY_CARDS,
+from .guilds import (
+    GUILDS_CARDS,
+    GUILDS_CARD_DEFS,
+    GUILDS_1E_NAMES,
+    GUILDS_2E_NAMES,
+    ALL_GUILDS_NAMES,
+    GuildsCardSpec,
+    get_cards as get_guilds_cards,
+    register_cards as register_guilds_cards,
 )
+
+try:
+    if "ALL_CARDS" in globals() and isinstance(ALL_CARDS, dict):
+        ALL_CARDS.update(GUILDS_CARDS)
+    if "CARD_REGISTRY" in globals() and isinstance(CARD_REGISTRY, dict):
+        CARD_REGISTRY.update(GUILDS_CARDS)
+    if "EXPANSION_CARDS" in globals() and isinstance(EXPANSION_CARDS, dict):
+        EXPANSION_CARDS["guilds"] = GUILDS_CARDS
+        EXPANSION_CARDS["Guilds"] = GUILDS_CARDS
+except Exception:
+    pass
 
 # --- Case-Insensitive Expansion Module Aliases ---
 import importlib as _importlib

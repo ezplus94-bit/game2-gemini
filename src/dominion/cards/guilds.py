@@ -1020,3 +1020,15 @@ def register_cards(target_registry: Optional[Dict[str, Any]] = None) -> Dict[str
         target_registry.update(GUILDS_CARDS)
         return target_registry
     return dict(GUILDS_CARDS)
+
+# Backwards-compatible aliases
+GUILDS_CARD_SPECS: Dict[str, Any] = GUILDS_CARDS
+GUILDS_KINGDOM_CARDS_1E: List[str] = GUILDS_1E_NAMES
+GUILDS_KINGDOM_CARDS_2E: List[str] = GUILDS_2E_NAMES
+CORNUCOPIA_GUILDS_2E_NEW_KINGDOM_CARDS: List[str] = [
+    d["name"] for d in GUILDS_CARD_DEFS if d["edition"] == "2E"
+]
+OVERPAY_CARDS: List[str] = [
+    d["name"] for d in GUILDS_CARD_DEFS if d.get("can_overpay")
+]
+REWARDS: List[str] = []
