@@ -57,3 +57,11 @@ def card_cost(state, card_name: str) -> int:
         return _da_card_cost(card_name, state)
     except Exception:
         return 0
+
+
+def is_walled(state, card_name: str, player: int) -> bool:
+    """Check if a pile is walled off and cannot be gained by the given player."""
+    walls = getattr(state, "walls", {})
+    owner = walls.get(card_name)
+    # Walled off if it belongs to another player
+    return owner is not None and owner != player
