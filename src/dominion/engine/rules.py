@@ -58,11 +58,18 @@ def apply_dark_ages_buy_triggers(state, buyer, bought_card_name: str, choices: d
     return react_hovel_on_victory_buy(state, buyer, bought_card_name, choices)
 
 # --- apply_guilds_cleanup_rules ---
-from ..cards.guilds import (
-    apply_guilds_cleanup as apply_guilds_cleanup_rules,
-    resolve_merchant_guild_end_of_buy,
-)
+try:
+    from ..cards.guilds import (
+        apply_guilds_cleanup as apply_guilds_cleanup_rules,
+        resolve_merchant_guild_end_of_buy,
+    )
+except ImportError:
+    # Safe fallbacks if Guilds cleanup handlers are missing
+    def apply_guilds_cleanup_rules(state, player, choices: dict | None = None) -> bool:
+        return False
 
+    def resolve_merchant_guild_end_of_buy(state, player, choices: dict | None = None) -> bool:
+        return False
 
 # --- Guilds (2013 / 2024 2E) Rules: Spending Coffers & Overpay ---
 def use_coffers_for_coins(game, player, count: int) -> int:
