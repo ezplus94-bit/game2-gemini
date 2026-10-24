@@ -7,7 +7,7 @@ def apply_hinterlands_cost_modifiers(base_cost: int, in_play_cards=()) -> int:
     return max(0, int(base_cost) - highway_count)
 
 # --- apply_dark_ages_cost_modifiers ---
-from .cards.dark_ages import _card_cost as _da_card_cost
+from ..cards.dark_ages import _card_cost as _da_card_cost
 
 
 def apply_dark_ages_cost_modifiers(state, card_name: str, base_cost: int | None = None) -> int:
