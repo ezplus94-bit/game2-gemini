@@ -1,3 +1,7 @@
+class IllegalActionError(Exception):
+    """Raised when a player attempts an invalid or illegal action."""
+    pass
+
 # --- Hinterlands Cleanup & Reaction Rules (Scheme, Trail, Weaver, Tunnel) ---
 def apply_scheme_cleanup(player) -> None:
     """Allows top-decking up to `schemes_active_this_turn` Action cards from play during Clean-up."""
@@ -81,3 +85,4 @@ def use_coffers_for_coins(game, player, count: int) -> int:
     player.coin_tokens = player.coffers
     player.coins = (getattr(player, "coins", 0) or 0) + actual
     return actual
+
