@@ -1,5 +1,5 @@
 # --- Hinterlands Effect Dispatchers ---
-from .cards.hinterlands import (
+from ..cards.hinterlands import (
     HINTERLANDS_CARDS,
     _gain_card,
     _discard_card,
@@ -16,7 +16,7 @@ def execute_hinterlands_card(game, player, card_name: str) -> bool:
     return False
 
 # --- execute_dark_ages_card ---
-from .cards.dark_ages import ALL_DARK_AGES_CARDS_BY_NAME
+from ..cards.dark_ages import ALL_DARK_AGES_CARDS_BY_NAME
 
 
 def execute_dark_ages_card(state, player, card_name: str, choices: dict | None = None) -> bool:

@@ -1,5 +1,5 @@
 # --- Hinterlands View Serialization ---
-from .cards.hinterlands import HINTERLANDS_CARDS
+from ..cards.hinterlands import HINTERLANDS_CARDS
 
 
 def serialize_hinterlands_state(player) -> dict:

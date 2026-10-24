@@ -1,5 +1,5 @@
 # --- Hinterlands Kingdom Setup Rules ---
-from .cards.hinterlands import HINTERLANDS_CARDS, HINTERLANDS_2E_CARDS
+from ..cards.hinterlands import HINTERLANDS_CARDS, HINTERLANDS_2E_CARDS
 
 
 def setup_hinterlands_pile_size(card_name: str, num_players: int = 2) -> int:
@@ -10,7 +10,7 @@ def setup_hinterlands_pile_size(card_name: str, num_players: int = 2) -> int:
 
 # --- setup_dark_ages_game ---
 import random as _da_random
-from .cards.dark_ages import (
+from ..cards.dark_ages import (
     ALL_DARK_AGES_CARDS_BY_NAME,
     DARK_AGES_KINGDOM_BY_NAME,
     KNIGHT_CARDS,
@@ -141,12 +141,12 @@ def setup_dark_ages_game(
     return state
 
 # --- setup_guilds_game ---
-from dominion.cards.guilds import setup_guilds_game
+from ..cards.guilds import setup_guilds_game
 
 
 # --- Guilds (2013 / 2024 2E) Setup Hook (Baker +1 Coffers at start of game) ---
 def _guilds_setup_hook(game) -> None:
-    from .cards.guilds import setup_baker
+    from ..cards.guilds import setup_baker
     supply = getattr(game, "supply", {})
     if "Baker" in supply:
         setup_baker(game)

@@ -1,5 +1,5 @@
 # --- Hinterlands Victory Scoring (Tunnel, Farmland, Silk Road) ---
-from .cards.hinterlands import HINTERLANDS_CARDS, score_silk_road
+from ..cards.hinterlands import HINTERLANDS_CARDS, score_silk_road
 
 
 def score_hinterlands_cards(player) -> int:
@@ -20,7 +20,7 @@ def score_hinterlands_cards(player) -> int:
     return total
 
 # --- score_dark_ages_cards ---
-from .cards.dark_ages import _card_name as _da_score_card_name, score_feodum
+from ..cards.dark_ages import _card_name as _da_score_card_name, score_feodum
 
 
 def score_dark_ages_cards(player_cards) -> int:
@@ -37,7 +37,7 @@ def score_dark_ages_cards(player_cards) -> int:
     return total_vp
 
 # --- score_guilds_cards ---
-from dominion.cards.guilds import score_guilds_cards
+from ..cards.guilds import score_guilds_cards
 
 
 # --- Guilds (2013 / 2024 2E) Scoring Notes ---

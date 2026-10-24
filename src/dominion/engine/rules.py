@@ -20,7 +20,7 @@ def apply_scheme_cleanup(player) -> None:
     player.schemes_active_this_turn = 0
 
 # --- apply_dark_ages_cleanup_rules ---
-from .cards.dark_ages import (
+from ..cards.dark_ages import (
     cleanup_hermit_discard_from_play,
     react_beggar_on_attack,
     react_hovel_on_victory_buy,
@@ -58,7 +58,7 @@ def apply_dark_ages_buy_triggers(state, buyer, bought_card_name: str, choices: d
     return react_hovel_on_victory_buy(state, buyer, bought_card_name, choices)
 
 # --- apply_guilds_cleanup_rules ---
-from dominion.cards.guilds import (
+from ..cards.guilds import (
     apply_guilds_cleanup as apply_guilds_cleanup_rules,
     resolve_merchant_guild_end_of_buy,
 )
