@@ -1,3 +1,4 @@
+import unittest
 """Grand Swap, The Snap, The Purge, the structured log and the end-of-game stats."""
 
 import json
@@ -482,3 +483,44 @@ def test_bot_answers_torturer_and_masquerade_through_the_server():
         assert room.game.state.pending is None
         assert host.last_error() is None
     run(scenario())
+
+
+def test_hinterlands_registered():
+    from dominion.cards.hinterlands import HINTERLANDS_CARDS, HINTERLANDS_2E_CARDS
+    assert len(HINTERLANDS_2E_CARDS) == 26
+    assert len(HINTERLANDS_CARDS) == 35
+
+# --- Dark Ages (2012) Registration Tests ---
+def test_dark_ages_registered():
+    from src.dominion.cards import ALL_CARDS, EXPANSION_CARDS
+    from src.dominion.cards.dark_ages import DARK_AGES_KINGDOM_CARDS
+
+    assert len(DARK_AGES_KINGDOM_CARDS) == 35
+    assert "dark_ages" in EXPANSION_CARDS
+    for spec in DARK_AGES_KINGDOM_CARDS:
+        if isinstance(ALL_CARDS, dict):
+            assert spec.name in ALL_CARDS
+        else:
+            assert any(getattr(c, "name", c) == spec.name for c in ALL_CARDS)
+
+
+def test_dark_ages_expansion_registered():
+    import src.dominion as dom
+
+    assert hasattr(dom, "EXPANSIONS")
+    if isinstance(dom.EXPANSIONS, dict):
+        assert "dark_ages" in dom.EXPANSIONS
+    else:
+        assert "dark_ages" in dom.EXPANSIONS or "Dark Ages" in dom.EXPANSIONS
+
+# --- Guilds (2013 / 2024 2E) Registration Tests ---
+import unittest
+
+class TestGuildsRegistrationUpdate(unittest.TestCase):
+    def test_guilds_cards_registered(self) -> None:
+        from dominion.cards.guilds import GUILDS_CARD_SPECS, REWARDS
+        self.assertIn("Baker", GUILDS_CARD_SPECS)
+        self.assertIn("Butcher", GUILDS_CARD_SPECS)
+        self.assertIn("Footpad", GUILDS_CARD_SPECS)
+        self.assertIn("Joust", GUILDS_CARD_SPECS)
+        self.assertEqual(len(REWARDS), 6)
