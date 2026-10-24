@@ -22,7 +22,7 @@ from typing import Callable, Optional, Sequence
 
 from ..cards import CardType, get_card
 from . import zones
-from ..cards.cardtypes import has_type, is_treasure as _is_treasure, treasure_coins, type_values
+from .cardtypes import has_type, is_treasure as _is_treasure, treasure_coins, type_values
 from .actions import Decision
 from .costs import card_cost, is_walled
 from .state import DurationEntry, GameState, Trigger
