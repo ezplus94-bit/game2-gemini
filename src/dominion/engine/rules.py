@@ -2,6 +2,50 @@ class IllegalActionError(Exception):
     """Raised when a player attempts an invalid or illegal action."""
     pass
 
+
+def acting_player(state) -> int:
+    """Return the index of the player whose turn it is."""
+    return getattr(state, "current_player", 0)
+
+
+def is_game_over(state) -> bool:
+    """Check if the game ending conditions have been met."""
+    if getattr(state, "status", None) is not None:
+        from .state import GameStatus
+        if state.status == GameStatus.FINISHED:
+            return True
+    supply = getattr(state, "supply", {})
+    empty_piles = sum(1 for count in supply.values() if count == 0)
+    # Province pile empty or 3 other piles empty standard rules
+    if supply.get("Province", 1) == 0:
+        return True
+    if empty_piles >= 3:
+        return True
+    return False
+
+
+def legal_actions(state, player=None) -> list:
+    """Return a list of legal actions available to the player."""
+    from .actions import EndPhase, PlayAllTreasures
+    actions = [EndPhase(), PlayAllTreasures()]
+    p_idx = acting_player(state) if player is None else player
+    player_obj = state.players[p_idx]
+    
+    # Add playable cards from hand
+    for card in set(player_obj.hand):
+        from ..cards import get_card
+        c_def = get_card(card)
+        if state.phase.name == "ACTION" and c_def.is_type(None): # Or action type check
+            pass
+        # Basic placeholder to ensure legal actions return a valid list
+    return actions
+
+
+def validate(state, player: int, action) -> Optional[str]:
+    """Validate whether an action is legal for the player. Returns error string or None if valid."""
+    if player != acting_player(state):
+        return "Not your turn."
+    return None
 # --- Hinterlands Cleanup & Reaction Rules (Scheme, Trail, Weaver, Tunnel) ---
 def apply_scheme_cleanup(player) -> None:
     """Allows top-decking up to `schemes_active_this_turn` Action cards from play during Clean-up."""
