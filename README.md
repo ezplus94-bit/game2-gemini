@@ -696,3 +696,10 @@ Updates 1-5 are listed as they were delivered earlier in this project; updates 6
 
 Ideas for later: smarter bots, a replace-with-bot button for dropped players, saving games across
 restarts, spectators, more expansions.
+
+### Dark Ages (2012)
+
+- **Kingdom Piles (35):** Poor House, Beggar, Squire, Vagrant, Forager, Hermit, Market Square, Sage, Storeroom, Urchin, Armory, Death Cart, Feodum, Fortress, Ironmonger, Marauder, Procession, Rats, Scavenger, Wandering Minstrel, Band of Misfits, Bandit Camp, Catacombs, Count, Counterfeit, Cultist, Graverobber, Junk Dealer, Knights (10 unique Knights), Mystic, Pillage, Rebuild, Rogue, Altar, Hunting Grounds.
+- **Ruins (5):** Abandoned Mine, Ruined Library, Ruined Market, Ruined Village, Survivors.
+- **Shelters (3):** Hovel, Necropolis, Overgrown Estate.
+- **Non-Supply (3):** Madman, Mercenary, Spoils.

@@ -20,3 +20,31 @@ COLONY = register(victory("Colony", 11, vp=10))
 CURSE = register(
     CardDef("Curse", 0, frozenset({CardType.CURSE}), vp=-1, text="-1 VP")
 )
+
+# --- Hinterlands Basic Supply Hooks (Duchy -> Duchess, Province -> Fool's Gold) ---
+HINTERLANDS_BASIC_HOOKS = {
+    "Duchy": "gain_duchess_if_in_supply",
+    "Province": "fools_gold_reaction",
+}
+
+# --- DARK_AGES_BASIC_HOOKS ---
+from .dark_ages import (
+    DARK_AGES_NON_SUPPLY_CARDS,
+    RUINS_CARDS,
+    RUINS_PILE_SPEC,
+    SHELTER_CARDS,
+)
+
+DARK_AGES_BASIC_HOOKS = {
+    "Ruins": RUINS_PILE_SPEC,
+    **{c.name: c for c in RUINS_CARDS},
+    **{c.name: c for c in SHELTER_CARDS},
+    **{c.name: c for c in DARK_AGES_NON_SUPPLY_CARDS},
+}
+
+# --- GUILDS_BASIC_HOOKS ---
+GUILDS_BASIC_HOOKS = {
+    "coffers_supported": True,
+    "overpay_supported": True,
+    "rewards_supported": True,
+}
