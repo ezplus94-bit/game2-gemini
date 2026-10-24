@@ -1,0 +1,6 @@
+{
+  "name": "dominion-browser-tests",
+  "private": true,
+  "description": "Optional: drives the real web page in jsdom against a live server.",
+  "dependencies": { "jsdom": "^26.0.0" }
+}
