@@ -4,7 +4,7 @@ from ..cards.hinterlands import _trash_card as hinterlands_trash_card
 from ..cards.hinterlands import _gain_card as hinterlands_gain_card
 
 # --- dark_ages_trash_card ---
-from .cards.dark_ages import (
+from ..cards.dark_ages import (
     _push_to_pile,
     _non_supply_piles,
     _trash_card as dark_ages_trash_card,
