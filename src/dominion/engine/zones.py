@@ -1,7 +1,7 @@
 # --- Hinterlands Zone Transition Hooks ---
-from .cards.hinterlands import _discard_card as hinterlands_discard_card
-from .cards.hinterlands import _trash_card as hinterlands_trash_card
-from .cards.hinterlands import _gain_card as hinterlands_gain_card
+from ..cards.hinterlands import _discard_card as hinterlands_discard_card
+from ..cards.hinterlands import _trash_card as hinterlands_trash_card
+from ..cards.hinterlands import _gain_card as hinterlands_gain_card
 
 # --- dark_ages_trash_card ---
 from .cards.dark_ages import (
