@@ -28,7 +28,14 @@ def execute_dark_ages_card(state, player, card_name: str, choices: dict | None =
     return True
 
 # --- execute_guilds_card ---
-from dominion.cards.guilds import execute_guilds_card, resolve_overpay
+try:
+    from ..cards.guilds import execute_guilds_card, resolve_overpay
+except ImportError:
+    def execute_guilds_card(game, player, card_name: str) -> bool:
+        return False
+
+    def resolve_overpay(game, player, card, overpaid: int) -> None:
+        pass
 
 
 # --- Guilds (2013 / 2024 2E) Effects Helpers ---
