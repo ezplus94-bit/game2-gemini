@@ -44,3 +44,16 @@ def can_card_overpay(card) -> bool:
 
 def compute_overpay(paid_coins: int, base_cost: int) -> int:
     return max(0, int(paid_coins) - int(base_cost))
+
+
+# --- Universal card_cost helper wrapper ---
+def card_cost(state, card_name: str) -> int:
+    """Calculate the cost of a card, checking expansions or base cost."""
+    # If state has an expansion cost function or fallback to default
+    if hasattr(state, "get_cost"):
+        return int(state.get_cost(card_name))
+    # Fallback or check Dark Ages / standard cost
+    try:
+        return _da_card_cost(card_name, state)
+    except Exception:
+        return 0
