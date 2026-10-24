@@ -39,7 +39,25 @@ except ImportError:
         return getattr(get_card(card), "types", ())
 from .actions import Decision
 from .costs import card_cost, is_walled
-from .state import DurationEntry, GameState, Trigger
+from .state import GameState
+
+try:
+    from .state import DurationEntry, Trigger
+except ImportError:
+    # Safe fallbacks if DurationEntry or Trigger are missing from state.py
+    class DurationEntry:
+        def __init__(self, source, cards, handler=None, data=None):
+            self.source = source
+            self.cards = cards
+            self.handler = handler
+            self.data = data
+
+    class Trigger:
+        def __init__(self, event, source, handler, owner):
+            self.event = event
+            self.source = source
+            self.handler = handler
+            self.owner = owner
 
 # Cards that "stay in play" together with a Duration card they played (Throne Room).
 DURATION_KEEPERS = frozenset({"Throne Room", "King's Court"})
