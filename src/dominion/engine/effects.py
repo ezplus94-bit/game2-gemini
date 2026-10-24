@@ -39,12 +39,14 @@ except ImportError:
         return getattr(get_card(card), "types", ())
 from .actions import Decision
 from .costs import card_cost, is_walled
-from .state import GameState
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .state import GameState
 
 try:
     from .state import DurationEntry, Trigger
 except ImportError:
-    # Safe fallbacks if DurationEntry or Trigger are missing from state.py
+    # Safe fallbacks if DurationEntry or Trigger are missing or caught in a circular import
     class DurationEntry:
         def __init__(self, source, cards, handler=None, data=None):
             self.source = source
