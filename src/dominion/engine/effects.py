@@ -22,7 +22,21 @@ from typing import Callable, Optional, Sequence
 
 from ..cards import CardType, get_card
 from . import zones
-from .cardtypes import has_type, is_treasure as _is_treasure, treasure_coins, type_values
+try:
+    from .cardtypes import has_type, is_treasure as _is_treasure, treasure_coins, type_values
+except ImportError:
+    # Safe fallbacks if cardtypes.py is missing from Git/Render
+    def has_type(state, card: str, card_type) -> bool:
+        return get_card(card).is_type(card_type)
+
+    def _is_treasure(state, card: str) -> bool:
+        return get_card(card).is_type(CardType.TREASURE)
+
+    def treasure_coins(state, card: str) -> int:
+        return getattr(get_card(card), "coins", 0)
+
+    def type_values(state, card: str) -> tuple:
+        return getattr(get_card(card), "types", ())
 from .actions import Decision
 from .costs import card_cost, is_walled
 from .state import DurationEntry, GameState, Trigger
