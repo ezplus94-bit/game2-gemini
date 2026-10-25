@@ -86,6 +86,14 @@ class GainEvent:
     zone: Optional[str]
     bought: bool = False
     from_supply: bool = True
+    action_gain_number: int = 0
+
+
+@dataclass
+class DiscardEvent:
+    """A card with an ``on_discard`` reaction that was discarded outside of Clean-up."""
+    player: int
+    card: str
 
 
 @dataclass
@@ -187,6 +195,12 @@ class GameState:
     extra_turns: int = 0              # Possession: extra turns still to be taken after the current turn
     extra_owner: Optional[int] = None  # ... and the player who will control them
     gain_events: list = field(default_factory=list)   # GainEvent objects waiting to be looked at
+    discard_events: list = field(default_factory=list)  # DiscardEvent objects waiting to be looked at
+    in_cleanup: bool = False                          # True during Clean-up (Tunnel/Trail/Weaver do not trigger)
+    actions_gained_this_turn: int = 0                 # Cauldron: Action cards gained by current player this turn
+    fools_gold_played: int = 0                        # Fool's Gold: copies played this turn
+    crossroads_played: int = 0                        # Crossroads: copies played this turn
+    schemes: int = 0                                  # Scheme: Action cards you may topdeck at Clean-up
     buying: bool = False                              # the card being gained right now is being bought (Hoard, Goons, Talisman)
     curse_treasure: bool = False                      # Charlatan is in the game: Curses are also Treasures worth $1
     trade_tokens: set = field(default_factory=set)    # Trade Route: Victory piles that still carry a token

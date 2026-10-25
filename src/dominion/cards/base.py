@@ -64,6 +64,9 @@ class CardDef:
     can_buy_fn: Optional[Callable] = None        # ``fn(state) -> reason or None``: why this card cannot be bought right now
     cost_mod: Optional[Callable] = None          # ``fn(state) -> int``: coins this card costs less right now (Peddler)
     play_at_turn_start: bool = False             # may be played from the hand at the start of its owner's turn (Clerk)
+    on_discard: Optional[EffectFn] = None        # Hinterlands: runs when discarded outside of Clean-up (Tunnel, Trail, Weaver)
+    on_trash: Optional[EffectFn] = None          # Hinterlands: runs when trashed (Nomads)
+    on_other_gain_reaction: Optional[EffectFn] = None  # Hinterlands: Reaction in hand when another player gains a card (Fool's Gold, Guard Dog)
     overpay: bool = False                        # Guilds: may overpay coins when buying this card
     on_overpay: Optional[Callable] = None        # Guilds: ``fn(ctx, amount)`` run when overpaid on buy
     on_buy_in_play: Optional[Callable] = None    # Guilds: ``fn(ctx, card_name)`` run when buying a card while this is in play
@@ -103,6 +106,7 @@ def treasure(
     on_gain_in_play: Optional[EffectFn] = None,
     can_buy_fn: Optional[Callable] = None,
     extra_types: tuple = (),
+    on_other_gain_reaction: Optional[EffectFn] = None,
     overpay: bool = False,
     on_overpay: Optional[Callable] = None,
 ) -> CardDef:
@@ -112,6 +116,7 @@ def treasure(
         text=f"${coins}" if text is None else text,
         potion_cost=potion_cost, potions=potions, coins_fn=coins_fn, kingdom=kingdom, expansion=expansion,
         on_gain=on_gain, on_gain_in_play=on_gain_in_play, can_buy_fn=can_buy_fn,
+        on_other_gain_reaction=on_other_gain_reaction,
         overpay=overpay, on_overpay=on_overpay,
     )
 
@@ -125,11 +130,29 @@ def victory(
     kingdom: bool = False,
     expansion: str = "Base",
     potion_cost: int = 0,
+    on_gain: Optional[EffectFn] = None,
 ) -> CardDef:
     return CardDef(
         name, cost, frozenset({CardType.VICTORY}),
         vp=vp, score_fn=score_fn, text=text or f"{vp} VP", kingdom=kingdom, expansion=expansion,
-        potion_cost=potion_cost,
+        potion_cost=potion_cost, on_gain=on_gain,
+    )
+
+
+def victory_reaction(
+    name: str,
+    cost: int,
+    vp: int = 0,
+    text: str = "",
+    kingdom: bool = True,
+    expansion: str = "Base",
+    on_discard: Optional[EffectFn] = None,
+) -> CardDef:
+    """A card that is both a Victory and a Reaction card (Tunnel)."""
+    return CardDef(
+        name, cost, frozenset({CardType.VICTORY, CardType.REACTION}),
+        vp=vp, text=text or f"{vp} VP", kingdom=kingdom, expansion=expansion,
+        on_discard=on_discard,
     )
 
 
@@ -154,6 +177,9 @@ def action(
     cost_mod: Optional[Callable] = None,
     play_at_turn_start: bool = False,
     on_gain_in_play: Optional[EffectFn] = None,
+    on_discard: Optional[EffectFn] = None,
+    on_trash: Optional[EffectFn] = None,
+    on_other_gain_reaction: Optional[EffectFn] = None,
     overpay: bool = False,
     on_overpay: Optional[Callable] = None,
     on_buy_in_play: Optional[Callable] = None,
@@ -167,6 +193,7 @@ def action(
         potion_cost=potion_cost, on_cleanup=on_cleanup, cleanup_order=cleanup_order,
         on_gain=on_gain, on_gain_reaction=on_gain_reaction, can_buy_fn=can_buy_fn, cost_mod=cost_mod,
         play_at_turn_start=play_at_turn_start, on_gain_in_play=on_gain_in_play,
+        on_discard=on_discard, on_trash=on_trash, on_other_gain_reaction=on_other_gain_reaction,
         overpay=overpay, on_overpay=on_overpay, on_buy_in_play=on_buy_in_play,
     )
 

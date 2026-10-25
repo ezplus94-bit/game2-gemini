@@ -7,7 +7,7 @@ from typing import Optional
 from ..cards import CardType, get_card
 from .constants import HAND_SIZE
 from .costs import is_walled
-from .state import GainEvent, GameState
+from .state import DiscardEvent, GainEvent, GameState
 
 # Zones a card can be moved between. "trash" is shared; the rest are per player.
 PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "island_mat", "village_mat", "haven", "horse_traders")
@@ -28,6 +28,10 @@ def send_to_trash(state: GameState, player_index: int, card: str) -> None:
         state.possession_aside.append(card)
     else:
         state.trash.append(card)
+    hook = get_card(card).on_trash
+    if hook is not None:
+        from .effects import EffectContext
+        hook(EffectContext(state, player_index, card))
 
 
 def return_possession_cards(state: GameState) -> int:
@@ -76,6 +80,8 @@ def move_card(state: GameState, player_index: int, card: str, source: str, desti
         send_to_trash(state, player_index, card)
     else:
         getattr(player, destination).append(card)
+        if destination == "discard" and not state.in_cleanup and get_card(card).on_discard is not None:
+            state.discard_events.append(DiscardEvent(player_index, card))
 
 
 def gain_card(state: GameState, player_index: int, card: str, destination: str = "discard") -> bool:
@@ -97,7 +103,13 @@ def gain_card(state: GameState, player_index: int, card: str, destination: str =
     if card in state.trade_tokens:                   # Trade Route: the pile's token moves to the mat
         state.trade_tokens.discard(card)
         state.trade_mat += 1
-    state.gain_events.append(GainEvent(player_index, card, destination, bought=state.buying))
+    act_num = 0
+    if get_card(card).is_type(CardType.ACTION) and player_index == state.current_player:
+        state.actions_gained_this_turn += 1
+        act_num = state.actions_gained_this_turn
+    state.gain_events.append(
+        GainEvent(player_index, card, destination, bought=state.buying, action_gain_number=act_num)
+    )
     state.buying = False                             # only the first gain of a purchase is the bought card
     return True
 
@@ -136,7 +148,13 @@ def gain_from_trash(state: GameState, player_index: int, card: str, destination:
     player.gained.append(card)
     if state.current_player == player_index:
         player.gained_turn.append(card)
-    state.gain_events.append(GainEvent(player_index, card, destination, from_supply=False))
+    act_num = 0
+    if get_card(card).is_type(CardType.ACTION) and player_index == state.current_player:
+        state.actions_gained_this_turn += 1
+        act_num = state.actions_gained_this_turn
+    state.gain_events.append(
+        GainEvent(player_index, card, destination, from_supply=False, action_gain_number=act_num)
+    )
     return True
 
 

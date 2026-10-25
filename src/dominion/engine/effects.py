@@ -25,7 +25,7 @@ from . import zones
 from .cardtypes import has_type, is_treasure as _is_treasure, treasure_coins, type_values
 from .actions import Decision
 from .costs import card_cost, is_walled
-from .state import DurationEntry, GameState, Trigger
+from .state import DiscardEvent, DurationEntry, GameState, Trigger
 
 # Cards that "stay in play" together with a Duration card they played (Throne Room).
 DURATION_KEEPERS = frozenset({"Throne Room", "King's Court"})
@@ -267,6 +267,8 @@ class EffectContext:
             return None
         self._state.players[i].discard.append(cards[0])
         self.log(f"{self._name(i)} discards {cards[0]} from the top of their deck.")
+        if not self._state.in_cleanup and get_card(cards[0]).on_discard is not None:
+            self._state.discard_events.append(DiscardEvent(i, cards[0]))
         return cards[0]
 
     # ---- Seaside: mats, Duration cards, tokens
@@ -373,6 +375,47 @@ class EffectContext:
     def put_in_play(self, card: str, zone: str = "hand") -> None:
         zones.move_card(self._state, self.player, card, zone, "in_play")
         self.log(f"{self._name()} plays {card} with {self.source}.")
+
+    def play_from_zone(self, card: str, zone: str = "hand"):
+        """Generator: move ``card`` from ``zone`` to ``in_play`` and resolve it without using an Action."""
+        zones.move_card(self._state, self.player, card, zone, "in_play")
+        self.log(f"{self._name()} plays {card} (from {zone}).", "play")
+        yield from self.resolve(card)
+
+    def shuffle_from_discard_to_deck(self, cards: Sequence[str]) -> None:
+        """Inn: reveal chosen Action cards from discard pile and shuffle them into the draw pile."""
+        me = self._me()
+        moved = []
+        for c in cards:
+            if c in me.discard:
+                me.discard.remove(c)
+                me.deck.append(c)
+                moved.append(c)
+        self._state.rng.shuffle(me.deck)
+        if moved:
+            self.log(f"{self._name()} reveals {', '.join(moved)} and shuffles them into their deck.", "reveal")
+
+    def lose_coins(self, amount: int) -> None:
+        """Souk: lose up to ``amount`` coins, never going below $0."""
+        lost = min(self._state.coins, max(0, amount))
+        self._state.coins -= lost
+        if lost:
+            self.log(f"{self._name()} loses ${lost}.")
+
+    def mark_crossroads(self) -> int:
+        self._state.crossroads_played += 1
+        return self._state.crossroads_played
+
+    def mark_fools_gold(self) -> int:
+        self._state.fools_gold_played += 1
+        return self._state.fools_gold_played
+
+    def add_scheme(self) -> None:
+        self._state.schemes += 1
+
+    def is_pile_walled(self, card: str, gainer: Optional[int] = None) -> bool:
+        who = self.player if gainer is None else gainer
+        return is_walled(self._state, card, who)
 
     def resolve(self, card: str):
         """Generator: run ``card``'s effect (without moving it). Use as
@@ -668,10 +711,15 @@ class EffectContext:
     def discard_hand(self, player: Optional[int] = None) -> int:
         i = self.player if player is None else player
         p = self._state.players[i]
-        count = len(p.hand)
-        p.discard.extend(p.hand)
+        hand_copy = list(p.hand)
+        count = len(hand_copy)
+        p.discard.extend(hand_copy)
         p.hand.clear()
         self.log(f"{self._name(i)} discards their hand ({count} card(s)).", "discard")
+        if not self._state.in_cleanup:
+            for c in hand_copy:
+                if get_card(c).on_discard is not None:
+                    self._state.discard_events.append(DiscardEvent(i, c))
         return count
 
     def set_aside_to_hand(self, card: str, player: Optional[int] = None) -> None:

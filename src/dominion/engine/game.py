@@ -244,22 +244,58 @@ class Game:
         self.state.pending = PendingEffect(decision, generator, source)
 
     def _settle(self) -> None:
-        """Once nothing is waiting for an answer, look at the cards that were just gained: "when you gain" effects
-        (Hoard, Collection, Mint, Royal Seal, Watchtower...) happen now, one gain at a time."""
+        """Once nothing is waiting for an answer, resolve queued discard reactions (Tunnel, Trail, Weaver)
+        and gain events (Border Village, Inn, Haggler, Watchtower, Trader, Fool's Gold, Guard Dog...)."""
         s = self.state
         if s.status is not GameStatus.ACTIVE:
             s.gain_events.clear()
+            s.discard_events.clear()
             return
-        if s.pending is None and s.gain_events:
-            self._advance(self._gain_steps(), None, "Gain")
+        if s.pending is None and (s.discard_events or s.gain_events):
+            self._advance(self._gain_steps(), None, "Trigger")
 
     def _gain_steps(self):
         s = self.state
-        while s.gain_events:
+        while s.discard_events or s.gain_events:
+            while s.discard_events:
+                devent = s.discard_events.pop(0)
+                dhook = get_card(devent.card).on_discard
+                if dhook is not None:
+                    res = dhook(EffectContext(s, devent.player, devent.card))
+                    if inspect.isgenerator(res):
+                        yield from res
+            if not s.gain_events:
+                break
             event = s.gain_events.pop(0)
             player = event.player
             me = s.players[player]
-            own = get_card(event.card).on_gain                       # "when you gain this" (Mint)
+            # Trader reaction: "When you would gain a card, you may reveal this from your hand, to instead gain a Silver."
+            if (event.card != "Silver" and "Trader" in me.hand and event.zone is not None
+                    and event.card in getattr(me, event.zone) and s.supply.get("Silver", 0) > 0
+                    and not zones.is_walled(s, "Silver", player)):
+                tctx = EffectContext(s, player, "Trader")
+                chosen = yield tctx.choose(
+                    f"You would gain {event.card}. You may reveal Trader from your hand to gain a Silver instead.",
+                    ("Reveal Trader (gain a Silver instead)",), 0, 1,
+                )
+                if chosen:
+                    tctx.log(f"{me.name} reveals Trader and gains a Silver instead of {event.card}.", "reveal")
+                    zone_list = getattr(me, event.zone)
+                    idx = len(zone_list) - 1 - zone_list[::-1].index(event.card)
+                    zone_list.pop(idx)
+                    if event.from_supply and event.card in s.supply:
+                        s.supply[event.card] += 1
+                    elif not event.from_supply:
+                        s.trash.append(event.card)
+                    if event.card in me.gained:
+                        me.gained.remove(event.card)
+                    if event.card in me.gained_turn:
+                        me.gained_turn.remove(event.card)
+                    if event.action_gain_number > 0:
+                        s.actions_gained_this_turn = max(0, s.actions_gained_this_turn - 1)
+                    zones.gain_card(s, player, "Silver", destination=event.zone)
+                    continue
+            own = get_card(event.card).on_gain                       # "when you gain this" (Mint, Border Village, Inn, Souk, Nomads...)
             if own is not None:
                 result = own(EffectContext(s, player, event.card), event)
                 if inspect.isgenerator(result):
@@ -279,6 +315,17 @@ class Game:
                 result = hook(EffectContext(s, player, name), event)
                 if inspect.isgenerator(result):
                     yield from result
+            n_players = len(s.players)
+            for offset in range(1, n_players):                       # Opponent gain reactions (Fool's Gold, Guard Dog)
+                other = (player + offset) % n_players
+                other_hand = s.players[other].hand
+                for name in sorted(set(other_hand)):
+                    ohook = get_card(name).on_other_gain_reaction
+                    if ohook is None or name not in other_hand:
+                        continue
+                    result = ohook(EffectContext(s, other, name), event)
+                    if inspect.isgenerator(result):
+                        yield from result
 
     def _begin_turn(self, player: int) -> None:
         self._advance(self._begin_turn_steps(player), None, "Start of turn")
@@ -322,6 +369,7 @@ class Game:
     def _cleanup_steps(self, player: int):
         s = self.state
         me = s.players[player]
+        s.in_cleanup = True
         # "When you discard this from play" effects, e.g. Alchemist (needs a Potion in play) before Herbalist.
         for card in sorted((c for c in me.in_play if get_card(c).on_cleanup is not None),
                            key=lambda c: (get_card(c).cleanup_order, c)):
@@ -345,6 +393,20 @@ class Game:
                 if name in remaining:
                     remaining.remove(name)
                     staying.append(name)
+        while s.schemes > 0:
+            scheme_opts = tuple(sorted({c for c in remaining if get_card(c).is_type(CardType.ACTION)}))
+            if not scheme_opts:
+                break
+            s.schemes -= 1
+            sctx = EffectContext(s, player, "Scheme")
+            chosen = yield sctx.choose(
+                "Scheme: you may put an Action card you are discarding from play onto your deck.",
+                scheme_opts, 0, 1,
+            )
+            if not chosen:
+                break
+            remaining.remove(chosen[0])
+            sctx.put_in_play_on_deck(chosen[0])
         me.discard.extend(me.hand)
         me.discard.extend(remaining)
         me.hand.clear()
@@ -364,6 +426,11 @@ class Game:
         s.banned.clear()
         s.war_chest_named.clear()
         s.buying = False
+        s.in_cleanup = False
+        s.actions_gained_this_turn = 0
+        s.fools_gold_played = 0
+        s.crossroads_played = 0
+        s.schemes = 0
         if me.blind > 0:
             me.blind -= 1
             if me.blind == 0:
