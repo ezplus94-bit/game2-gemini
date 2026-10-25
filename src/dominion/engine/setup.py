@@ -6,7 +6,7 @@ import random
 from dataclasses import dataclass, field, replace
 from typing import Optional
 
-from ..cards import CardType, UnknownCardError, expansions as all_expansions, get_card, kingdom_cards
+from ..cards import CardType, UnknownCardError, expansions as all_expansions, get_card, kingdom_cards, prize_cards
 from . import zones
 from .constants import (
     CATASTROPHE_PILE_SIZE, EMPTY_PILE_LIMIT, HAND_SIZE, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS, PLATINUM_PILE_SIZE,
@@ -28,6 +28,7 @@ class GameConfig:
     expansions: Optional[list] = None     # card sets a RANDOM Kingdom is drawn from; None = every set
     cheats: bool = False                  # allow cheat codes (+100 coins / actions / buys) in this game
     colonies: Optional[bool] = None       # Platinum and Colony in the Supply: None = decided by the seed (Prosperity card picked)
+    bane: Optional[str] = None            # Cornucopia: Bane pile card name when Young Witch is in the Kingdom
 
 
 def new_game(config: GameConfig) -> Game:
@@ -40,22 +41,27 @@ def new_game(config: GameConfig) -> Game:
     seed = config.seed if config.seed is not None else random.SystemRandom().randrange(2**32)
     expansions = _resolve_expansions(config.expansions)
     kingdom = _resolve_kingdom(config.kingdom, seed, expansions)
+    bane = _resolve_bane(config.bane, kingdom, seed, expansions)
     catastrophes = _resolve_catastrophes(config.catastrophes, len(names))
     fenced = _with_companions(catastrophes)
     colonies = _resolve_colonies(config.colonies, kingdom, seed)
-    supply = _build_supply(len(names), kingdom, fenced, config.supply_overrides, colonies)
+    supply_kingdom = [*kingdom, bane] if bane is not None else kingdom
+    supply = _build_supply(len(names), supply_kingdom, fenced, config.supply_overrides, colonies)
 
     rng = random.Random(seed)
+    starting_coffers = 1 if "Baker" in supply_kingdom else 0
     players = []
     for name in names:
         deck = ["Copper"] * STARTING_COPPERS + ["Estate"] * STARTING_ESTATES
         rng.shuffle(deck)
-        players.append(PlayerState(name=name, deck=deck))
+        players.append(PlayerState(name=name, deck=deck, coffers=starting_coffers))
 
+    prizes = prize_cards() if "Tournament" in supply_kingdom else []
     state = GameState(
-        players=players, supply=supply, kingdom=tuple(kingdom), rng=rng,
+        players=players, supply=supply, kingdom=tuple(supply_kingdom), rng=rng,
         empty_pile_limit=EMPTY_PILE_LIMIT, catastrophes=tuple(fenced), cheats=bool(config.cheats),
-        curse_treasure="Charlatan" in kingdom,                  # Charlatan turns Curses into Treasures for the whole game
+        curse_treasure="Charlatan" in supply_kingdom,           # Charlatan turns Curses into Treasures for the whole game
+        prizes=prizes, bane=bane,
     )
     if "Trade Route" in kingdom:                                # a token on every Victory pile in the Supply
         state.trade_tokens = {name for name in supply if get_card(name).is_type(CardType.VICTORY)}
@@ -69,7 +75,7 @@ def new_game(config: GameConfig) -> Game:
     state.log.append(f"Turn 1 - {players[state.current_player].name}", "turn")
 
     resolved = replace(config, seed=seed, kingdom=list(kingdom), catastrophes=list(catastrophes), expansions=expansions,
-                       colonies=colonies)
+                       colonies=colonies, bane=bane)
     return Game(state, resolved)
 
 
@@ -109,6 +115,32 @@ def _resolve_kingdom(requested: Optional[list], seed: int, expansions: Optional[
             if not card.kingdom:
                 raise ValueError(f"{name} cannot be used as a Kingdom card.")
     return sorted(picked, key=lambda n: (get_card(n).cost, n))
+
+
+def _resolve_bane(requested: Optional[str], kingdom: list, seed: int, expansions: Optional[list] = None) -> Optional[str]:
+    """Young Witch needs an extra Kingdom pile costing $2 or $3 (and 0 Potions) as the Bane pile."""
+    if "Young Witch" not in kingdom:
+        return None
+    if requested is not None:
+        try:
+            card = get_card(requested)
+        except UnknownCardError:
+            raise ValueError(f"Unknown Bane card: {requested}") from None
+        if not card.kingdom or requested in kingdom or card.cost not in (2, 3) or card.potion_cost != 0:
+            raise ValueError(f"{requested} cannot be used as a Bane card (must be an unused $2-$3 Kingdom card).")
+        return requested
+    pool = [
+        c for c in kingdom_cards(expansions)
+        if c not in kingdom and get_card(c).cost in (2, 3) and get_card(c).potion_cost == 0
+    ]
+    if not pool:
+        pool = [
+            c for c in kingdom_cards()
+            if c not in kingdom and get_card(c).cost in (2, 3) and get_card(c).potion_cost == 0
+        ]
+    if not pool:
+        return None
+    return random.Random(seed ^ 0xBA4E).choice(pool)
 
 
 def _resolve_colonies(requested: Optional[bool], kingdom: list, seed: int) -> bool:

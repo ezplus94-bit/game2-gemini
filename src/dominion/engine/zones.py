@@ -10,7 +10,7 @@ from .costs import is_walled
 from .state import GainEvent, GameState
 
 # Zones a card can be moved between. "trash" is shared; the rest are per player.
-PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "island_mat", "village_mat", "haven")
+PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "island_mat", "village_mat", "haven", "horse_traders")
 
 
 def beneficiary(state: GameState, player_index: int) -> int:
@@ -99,6 +99,25 @@ def gain_card(state: GameState, player_index: int, card: str, destination: str =
         state.trade_mat += 1
     state.gain_events.append(GainEvent(player_index, card, destination, bought=state.buying))
     state.buying = False                             # only the first gain of a purchase is the bought card
+    return True
+
+
+def gain_prize(state: GameState, player_index: int, card: str, destination: str = "deck") -> bool:
+    """Move a Prize card from the non-Supply Prize pile to a player's zone (Tournament)."""
+    if card not in state.prizes:
+        return False
+    taker = beneficiary(state, player_index)
+    if taker != player_index:
+        player_index, destination = taker, "discard"
+    if destination not in ("discard", "hand", "deck"):
+        raise ValueError(f"Unknown destination: {destination}")
+    state.prizes.remove(card)
+    player = state.players[player_index]
+    getattr(player, destination).append(card)
+    player.gained.append(card)
+    if state.current_player == player_index:
+        player.gained_turn.append(card)
+    state.gain_events.append(GainEvent(player_index, card, destination, bought=False, from_supply=False))
     return True
 
 

@@ -37,6 +37,7 @@ def card_info(name: str, state=None) -> dict:
         "min_players": card.min_players,
         "expansion": card.expansion,
         "companions": list(card.companions),
+        "overpay": card.overpay,
     }
 
 
@@ -56,6 +57,7 @@ def build_view(game, player: int) -> dict:
             info["catastrophe"] = name in s.catastrophes
             info["embargo"] = s.embargo.get(name, 0)         # Embargo tokens on this pile
             info["walled_by"] = s.walls.get(name)     # Fortnite: index of the player whose wall stands here, or None
+            info["bane"] = (name == s.bane)
             piles.append(info)
 
     players = []
@@ -77,6 +79,9 @@ def build_view(game, player: int) -> dict:
             "haven": len(p.haven),
             "pirate_tokens": p.pirate_tokens,
             "vp_tokens": p.vp_tokens,
+            "coffers": p.coffers,
+            "villagers": p.villagers,
+            "horse_traders": len(p.horse_traders),
             "possessed_by": s.possessor if (s.possessor is not None and i == s.current_player) else None,
             "vp": score_player(p),            # deliberately public: players asked to see each other's VP
         })
@@ -103,13 +108,17 @@ def build_view(game, player: int) -> dict:
     else:
         legal = [action_to_dict(a) for a in legal_actions(s, player) if not isinstance(a, Choose)]
 
-    names = {name for name in s.supply}
+    names = {name for name in s.supply} | set(s.prizes)
+    for p in s.players:
+        names.update(p.all_cards())
     view = {
         "status": s.status.value,
         "version": len(game.history),     # increases with every applied action
         "you": player,
         "players": players,
         "piles": piles,
+        "prizes": [card_info(n, s) for n in s.prizes],
+        "bane": s.bane,
         "trash": list(s.trash),
         "cost_reduction": s.cost_reduction,
         "midas": s.midas,

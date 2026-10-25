@@ -31,7 +31,7 @@ from ..cards import expansions as all_expansions, kingdom_cards
 from ..cards.registry import fenced_cards
 from ..engine import (
     Buy, Cheat, Choose, EndGame, EndPhase, Resign, GameConfig, GameStatus, IllegalActionError, PlayAction,
-    PlayAllTreasures, PlayTreasure, action_from_dict, build_view, new_game, replay,
+    PlayAllTreasures, PlayTreasure, SpendCoffers, SpendVillagers, action_from_dict, build_view, new_game, replay,
 )
 from ..engine.constants import CHEAT_PHRASES, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS
 from ..engine.views import card_info
@@ -755,6 +755,10 @@ def _describe_action(action) -> str:
         return "play all Treasures"
     if isinstance(action, Buy):
         return f"buy {action.card}"
+    if isinstance(action, SpendCoffers):
+        return f"spend {action.count} Coffers"
+    if isinstance(action, SpendVillagers):
+        return f"spend {action.count} Villager(s)"
     if isinstance(action, EndPhase):
         return "end a phase"
     if isinstance(action, Choose):

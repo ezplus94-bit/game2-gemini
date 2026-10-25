@@ -18,6 +18,7 @@ from typing import Optional
 from ..cards import CardType, get_card
 from .actions import (
     Action, Buy, Cheat, Choose, Decision, EndGame, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, Resign,
+    SpendCoffers, SpendVillagers,
 )
 from .cardtypes import is_treasure
 from .constants import CHEAT_KINDS
@@ -93,6 +94,24 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
     if isinstance(action, EndPhase):
         return None
 
+    if isinstance(action, SpendCoffers):
+        if state.phase is not Phase.BUY:
+            return "Coffers can only be spent during the Buy phase."
+        if not isinstance(action.count, int) or action.count < 1:
+            return "Spend at least 1 Coffers."
+        if action.count > me.coffers:
+            return f"You only have {me.coffers} Coffers."
+        return None
+
+    if isinstance(action, SpendVillagers):
+        if state.phase is not Phase.ACTION:
+            return "Villagers can only be spent during the Action phase."
+        if not isinstance(action.count, int) or action.count < 1:
+            return "Spend at least 1 Villager."
+        if action.count > me.villagers:
+            return f"You only have {me.villagers} Villager(s)."
+        return None
+
     if isinstance(action, PlayAction):
         if state.phase is not Phase.ACTION:
             return "Actions can only be played during the Action phase."
@@ -163,6 +182,8 @@ def legal_actions(state: GameState, player: Optional[int] = None) -> list:
             for card in sorted(set(me.hand)):
                 if get_card(card).is_type(CardType.ACTION):
                     result.append(PlayAction(card))
+        if me.villagers >= 1:
+            result.append(SpendVillagers(1))
         result.append(EndPhase())
         return result
 
@@ -172,6 +193,10 @@ def legal_actions(state: GameState, player: Optional[int] = None) -> list:
         result.append(PlayTreasure(card))
     if treasures:
         result.append(PlayAllTreasures())
+    if me.coffers >= 1:
+        result.append(SpendCoffers(1))
+        if me.coffers > 1:
+            result.append(SpendCoffers(me.coffers))
     if state.buys >= 1 and not state.buy_locked:
         for name in sorted(state.supply):
             if state.supply[name] > 0 and card_cost(state, name) <= state.coins and not is_walled(state, name, actor) and state.potions >= get_card(name).potion_cost and _buy_restriction(state, name) is None:

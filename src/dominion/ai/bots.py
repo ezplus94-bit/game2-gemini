@@ -7,7 +7,7 @@ import random
 from typing import Optional, Protocol, Sequence
 
 from ..cards import CardType, UnknownCardError, get_card
-from ..engine import Buy, Choose, EndPhase, Game, PlayAllTreasures, Phase
+from ..engine import Buy, Choose, EndPhase, Game, PlayAllTreasures, Phase, SpendCoffers
 
 
 def _keep_value(name: str) -> float:
@@ -55,6 +55,9 @@ class BigMoneyBot:
             return EndPhase()
         if PlayAllTreasures() in legal:
             return PlayAllTreasures()
+        me = state.players[state.current_player]
+        if me.coffers > 0 and SpendCoffers(me.coffers) in legal and state.coins in (2, 5, 7):
+            return SpendCoffers(1)
         for card in ("Province", "Gold", "Silver"):
             if Buy(card) in legal:
                 return Buy(card)

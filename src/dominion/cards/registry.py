@@ -61,6 +61,11 @@ def catastrophe_cards() -> list[str]:
     return sorted(name for name, card in _CARDS.items() if CardType.CATASTROPHE in card.types)
 
 
+def prize_cards() -> list[str]:
+    """Names of every Cornucopia Prize card (non-Supply cards gained via Tournament)."""
+    return sorted(name for name, card in _CARDS.items() if CardType.PRIZE in card.types)
+
+
 def kingdom_cards(expansions=None) -> list[str]:
     """Names of every card that may be selected as a Kingdom pile.
     ``expansions`` (e.g. ``["Intrigue"]``) limits the list to those card sets; None = all."""

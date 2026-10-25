@@ -66,7 +66,22 @@ class Cheat:
     kind: str
 
 
-Action = Union[PlayAction, PlayTreasure, PlayAllTreasures, Buy, EndPhase, Choose, Resign, EndGame, Cheat]
+@dataclass(frozen=True)
+class SpendCoffers:
+    """Spend ``count`` Coffers tokens for +$1 each (Guilds)."""
+    count: int = 1
+
+
+@dataclass(frozen=True)
+class SpendVillagers:
+    """Spend ``count`` Villagers tokens for +1 Action each."""
+    count: int = 1
+
+
+Action = Union[
+    PlayAction, PlayTreasure, PlayAllTreasures, Buy, EndPhase, Choose, Resign, EndGame, Cheat,
+    SpendCoffers, SpendVillagers,
+]
 
 
 @dataclass(frozen=True)

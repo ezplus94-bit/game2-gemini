@@ -125,6 +125,9 @@ class PlayerState:
     durations: list = field(default_factory=list)     # DurationEntry objects waiting for the start of the next turn
     pirate_tokens: int = 0                            # Seaside: coin tokens on the Pirate Ship mat
     vp_tokens: int = 0                                # Prosperity: victory point tokens (worth their number at the end)
+    coffers: int = 0                                  # Guilds: persistent coin tokens (+$1 each when spent)
+    villagers: int = 0                                # Guilds: persistent action tokens (+1 Action each when spent)
+    horse_traders: list = field(default_factory=list) # Cornucopia: Horse Traders set aside until start of next turn
     gained_turn: list = field(default_factory=list)   # cards gained during this player's current turn (Smugglers)
     last_gained: list = field(default_factory=list)   # ... and during their previous turn
     turns_taken: int = 0
@@ -133,7 +136,7 @@ class PlayerState:
 
     def all_cards(self) -> list:
         return [*self.deck, *self.hand, *self.discard, *self.in_play, *self.set_aside,
-                *self.island_mat, *self.village_mat, *self.haven]
+                *self.island_mat, *self.village_mat, *self.haven, *self.horse_traders]
 
 
 @dataclass
@@ -192,6 +195,8 @@ class GameState:
     banned: set = field(default_factory=set)          # Contraband: cards that cannot be bought this turn
     war_chest_named: list = field(default_factory=list)   # cards named for War Chests this turn
     embargo: dict = field(default_factory=dict)       # Seaside: Supply pile -> number of Embargo tokens on it
+    prizes: list = field(default_factory=list)        # Cornucopia: Prize cards remaining in the Prize pile
+    bane: Optional[str] = None                        # Cornucopia: Young Witch's Bane pile card name
     bought_victory: bool = False                      # a Victory card was bought this turn (Treasury)
     outpost_flag: bool = False                        # Outpost was played this turn
     outpost_next: bool = False                        # the next turn is the same player's Outpost turn

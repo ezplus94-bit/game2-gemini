@@ -20,6 +20,7 @@ class CardType(str, Enum):
     ATTACK = "attack"
     REACTION = "reaction"
     DURATION = "duration"            # Seaside: stays in play until the start of its owner's next turn
+    PRIZE = "prize"                  # Cornucopia: non-Supply Prize cards gained from Tournament
     CATASTROPHE = "catastrophe"      # optional high-impact house-rule cards
     SPECIAL = "special"              # optional single-use house-rule cards that help a player
     # Future: DURATION ...
@@ -63,6 +64,9 @@ class CardDef:
     can_buy_fn: Optional[Callable] = None        # ``fn(state) -> reason or None``: why this card cannot be bought right now
     cost_mod: Optional[Callable] = None          # ``fn(state) -> int``: coins this card costs less right now (Peddler)
     play_at_turn_start: bool = False             # may be played from the hand at the start of its owner's turn (Clerk)
+    overpay: bool = False                        # Guilds: may overpay coins when buying this card
+    on_overpay: Optional[Callable] = None        # Guilds: ``fn(ctx, amount)`` run when overpaid on buy
+    on_buy_in_play: Optional[Callable] = None    # Guilds: ``fn(ctx, card_name)`` run when buying a card while this is in play
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -98,13 +102,17 @@ def treasure(
     on_gain: Optional[EffectFn] = None,
     on_gain_in_play: Optional[EffectFn] = None,
     can_buy_fn: Optional[Callable] = None,
+    extra_types: tuple = (),
+    overpay: bool = False,
+    on_overpay: Optional[Callable] = None,
 ) -> CardDef:
     """A Treasure. ``on_play`` is a Treasure's extra effect (run when it is played in the Buy phase)."""
     return CardDef(
-        name, cost, frozenset({CardType.TREASURE}), coins=coins, on_play=on_play,
+        name, cost, frozenset({CardType.TREASURE, *extra_types}), coins=coins, on_play=on_play,
         text=f"${coins}" if text is None else text,
         potion_cost=potion_cost, potions=potions, coins_fn=coins_fn, kingdom=kingdom, expansion=expansion,
         on_gain=on_gain, on_gain_in_play=on_gain_in_play, can_buy_fn=can_buy_fn,
+        overpay=overpay, on_overpay=on_overpay,
     )
 
 
@@ -146,6 +154,9 @@ def action(
     cost_mod: Optional[Callable] = None,
     play_at_turn_start: bool = False,
     on_gain_in_play: Optional[EffectFn] = None,
+    overpay: bool = False,
+    on_overpay: Optional[Callable] = None,
+    on_buy_in_play: Optional[Callable] = None,
 ) -> CardDef:
     """An Action card. ``extra_types`` adds e.g. CardType.ATTACK / REACTION."""
     return CardDef(
@@ -156,6 +167,7 @@ def action(
         potion_cost=potion_cost, on_cleanup=on_cleanup, cleanup_order=cleanup_order,
         on_gain=on_gain, on_gain_reaction=on_gain_reaction, can_buy_fn=can_buy_fn, cost_mod=cost_mod,
         play_at_turn_start=play_at_turn_start, on_gain_in_play=on_gain_in_play,
+        overpay=overpay, on_overpay=on_overpay, on_buy_in_play=on_buy_in_play,
     )
 
 

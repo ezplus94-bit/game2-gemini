@@ -21,6 +21,7 @@ from . import zones
 from .cardtypes import is_treasure
 from .actions import (
     Action, Buy, Cheat, Choose, EndGame, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, Resign,
+    SpendCoffers, SpendVillagers,
 )
 from .constants import CHEAT_AMOUNT, EXODIA_PIECES, HAND_SIZE
 from .costs import card_cost
@@ -73,6 +74,10 @@ class Game:
                     break
         elif isinstance(action, Buy):
             self._buy(owner, action.card)
+        elif isinstance(action, SpendCoffers):
+            self._spend_coffers(owner, action.count)
+        elif isinstance(action, SpendVillagers):
+            self._spend_villagers(owner, action.count)
         elif isinstance(action, EndPhase):
             self._end_phase(owner)
         elif isinstance(action, Choose):
@@ -123,6 +128,20 @@ class Game:
         me.in_play.append(card)
         self._advance(EffectContext(s, player, card).resolve_treasure(card), None, card)     # its $ and its own effect
 
+    def _spend_coffers(self, player: int, count: int) -> None:
+        s = self.state
+        me = s.players[player]
+        me.coffers -= count
+        s.coins += count
+        s.log.append(f"{me.name} spends {count} Coffers (+${count}).", "treasure")
+
+    def _spend_villagers(self, player: int, count: int) -> None:
+        s = self.state
+        me = s.players[player]
+        me.villagers -= count
+        s.actions += count
+        s.log.append(f"{me.name} spends {count} Villager(s) (+{count} Action(s)).", "play")
+
     def _buy(self, player: int, card: str) -> None:
         s = self.state
         s.coins -= card_cost(s, card)
@@ -142,6 +161,31 @@ class Game:
         for _ in range(s.embargo.get(card, 0)):               # Embargo: a Curse for each token on the pile
             if zones.gain_card(s, player, "Curse"):
                 s.log.append(f"{s.players[zones.beneficiary(s, player)].name} gains a Curse (Embargo).", "gain", 1)
+        self._advance(self._buy_steps(player, card), None, card)
+
+    def _buy_steps(self, player: int, card: str):
+        s = self.state
+        me = s.players[player]
+        for name in sorted(set(me.in_play)):
+            hook = get_card(name).on_buy_in_play
+            if hook is None:
+                continue
+            for _ in range(me.in_play.count(name)):
+                res = hook(EffectContext(s, player, name), card)
+                if inspect.isgenerator(res):
+                    yield from res
+        cdef = get_card(card)
+        if cdef.overpay and s.coins > 0 and cdef.on_overpay is not None:
+            ctx = EffectContext(s, player, card)
+            opts = tuple(f"${n}" for n in range(s.coins + 1))
+            (ans,) = yield ctx.choose(f"{card}: you may overpay up to ${s.coins}.", opts)
+            amount = int(ans[1:])
+            if amount > 0:
+                s.coins -= amount
+                s.log.append(f"{me.name} overpays ${amount} for {card}.", "buy", 1)
+                res = cdef.on_overpay(ctx, amount)
+                if inspect.isgenerator(res):
+                    yield from res
 
     def _cheat(self, player: int, kind: str) -> None:
         s = self.state
@@ -247,6 +291,12 @@ class Game:
         for entry in entries:
             if entry.handler is not None:
                 entry.handler(EffectContext(s, player, entry.source), entry)
+        if me.horse_traders:
+            ht_cards, me.horse_traders = list(me.horse_traders), []
+            for ht in ht_cards:
+                me.hand.append(ht)
+                zones.draw_cards(s, player, 1)
+                s.log.append(f"{me.name} returns {ht} to their hand and draws 1 card.", "draw", 1)
         while True:
             options = tuple(sorted({c for c in me.hand if get_card(c).play_at_turn_start}))
             if not options:

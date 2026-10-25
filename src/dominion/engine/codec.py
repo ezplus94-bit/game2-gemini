@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .actions import Action, Buy, Choose, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure
+from .actions import (
+    Action, Buy, Choose, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, SpendCoffers, SpendVillagers,
+)
 
 MAX_SELECTION = 50
 MAX_NAME_LENGTH = 60
@@ -28,6 +30,10 @@ def action_to_dict(action: Action) -> dict:
         return {"type": "end_phase"}
     if isinstance(action, Choose):
         return {"type": "choose", "selection": list(action.selection)}
+    if isinstance(action, SpendCoffers):
+        return {"type": "spend_coffers", "count": action.count}
+    if isinstance(action, SpendVillagers):
+        return {"type": "spend_villagers", "count": action.count}
     raise ValueError(f"Cannot encode action: {action!r}")
 
 
@@ -59,4 +65,14 @@ def action_from_dict(data: Any) -> Action:
         if not all(isinstance(c, str) and len(c) <= MAX_NAME_LENGTH for c in selection):
             raise ValueError("'selection' must contain card names.")
         return Choose(tuple(selection))
+    if kind == "spend_coffers":
+        count = data.get("count", 1)
+        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+            raise ValueError("'count' must be a positive integer.")
+        return SpendCoffers(count)
+    if kind == "spend_villagers":
+        count = data.get("count", 1)
+        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+            raise ValueError("'count' must be a positive integer.")
+        return SpendVillagers(count)
     raise ValueError("Unknown action type.")

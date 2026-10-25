@@ -11,6 +11,8 @@ def card_cost(state: GameState, name: str) -> int:
     ``cost_mod`` such as Peddler's), never below $0."""
     card = get_card(name)
     reduction = state.cost_reduction
+    if 0 <= state.current_player < len(state.players):
+        reduction += 2 * state.players[state.current_player].in_play.count("Princess")
     if card.is_type(CardType.ACTION):
         reduction += state.action_cost_reduction
     if card.cost_mod is not None:

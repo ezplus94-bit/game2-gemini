@@ -147,6 +147,66 @@ class EffectContext:
     def add_coins(self, n: int) -> None:
         self._state.coins += n
 
+    @property
+    def actions_left(self) -> int:
+        return self._state.actions
+
+    @property
+    def coffers(self) -> int:
+        return self._me().coffers
+
+    def add_coffers(self, n: int) -> None:
+        if n > 0:
+            self._me().coffers += n
+            self.log(f"{self._name()} takes {n} Coffers ({self._me().coffers} in all).", "gain")
+
+    def remove_coffers(self, n: int) -> None:
+        if n > 0:
+            self._me().coffers = max(0, self._me().coffers - n)
+            self.log(f"{self._name()} removes {n} Coffers ({self._me().coffers} left).")
+
+    @property
+    def villagers(self) -> int:
+        return self._me().villagers
+
+    def add_villagers(self, n: int) -> None:
+        if n > 0:
+            self._me().villagers += n
+            self.log(f"{self._name()} takes {n} Villager(s) ({self._me().villagers} in all).", "gain")
+
+    @property
+    def bane_card(self) -> Optional[str]:
+        return self._state.bane
+
+    def prize_options(self) -> tuple:
+        return tuple(self._state.prizes)
+
+    def is_pile_walled(self, card: str, gainer: Optional[int] = None) -> bool:
+        who = self.player if gainer is None else gainer
+        return is_walled(self._state, card, who)
+
+    def gain_prize(self, card: str, destination: str = "deck") -> bool:
+        ok = zones.gain_prize(self._state, self.player, card, destination)
+        if ok:
+            taker = zones.beneficiary(self._state, self.player)
+            if taker != self.player:
+                self.log(f"{self._name(taker)} gains Prize {card} (Possession).", "gain")
+            else:
+                where = "" if destination == "discard" else f" onto their {destination}"
+                self.log(f"{self._name()} gains Prize {card}{where}.", "gain")
+        return ok
+
+    def namable_cards(self) -> tuple:
+        """Cards a player may name for Doctor / Journeyman / Wishing Well."""
+        return tuple(sorted(set(self._state.supply) | set(self._state.prizes)))
+
+    def put_deck_in_discard(self) -> None:
+        me = self._me()
+        count = len(me.deck)
+        me.discard.extend(me.deck)
+        me.deck.clear()
+        self.log(f"{self._name()} puts their deck ({count} card(s)) into their discard pile.", "discard")
+
     # ---- card movement
     def draw(self, count: int, player: Optional[int] = None, quiet: bool = False) -> list:
         i = self.player if player is None else player
