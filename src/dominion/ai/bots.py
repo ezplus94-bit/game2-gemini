@@ -55,9 +55,10 @@ class BigMoneyBot:
             return EndPhase()
         if PlayAllTreasures() in legal:
             return PlayAllTreasures()
-        me = state.players[state.current_player]
-        if me.coffers > 0 and SpendCoffers(me.coffers) in legal and state.coins in (2, 5, 7):
-            return SpendCoffers(1)
+        coffers = state.players[state.current_player].coffers
+        for spend in (SpendCoffers(coffers), SpendCoffers(1)):       # Coffers tokens are +$1 each: use them before buying
+            if coffers and spend in legal:
+                return spend
         for card in ("Province", "Gold", "Silver"):
             if Buy(card) in legal:
                 return Buy(card)

@@ -30,8 +30,33 @@ class PlayAllTreasures:
 
 @dataclass(frozen=True)
 class Buy:
-    """Buy a card from the supply (Buy phase)."""
+    """Buy a card from the supply (Buy phase). ``overpay`` is the extra $ paid on a card that may be overpaid for."""
     card: str
+    overpay: int = 0
+
+
+@dataclass(frozen=True)
+class BuyEvent:
+    """Buy an Event (Adventures) with a Buy and its cost in $ (Buy phase). Events are never gained."""
+    card: str
+
+
+@dataclass(frozen=True)
+class SpendCoffers:
+    """Remove ``count`` tokens from your Coffers mat for +$1 each (any time during your turn)."""
+    count: int = 1
+
+
+@dataclass(frozen=True)
+class SpendVillager:
+    """Remove ``count`` tokens from your Villagers mat for +1 Action each (Renaissance, Action phase)."""
+    count: int = 1
+
+
+@dataclass(frozen=True)
+class PayDebt:
+    """Spend ``count`` $ to remove that many Debt tokens (Empires, Buy phase). You cannot buy while you owe Debt."""
+    count: int = 1
 
 
 @dataclass(frozen=True)
@@ -66,22 +91,7 @@ class Cheat:
     kind: str
 
 
-@dataclass(frozen=True)
-class SpendCoffers:
-    """Spend ``count`` Coffers tokens for +$1 each (Guilds)."""
-    count: int = 1
-
-
-@dataclass(frozen=True)
-class SpendVillagers:
-    """Spend ``count`` Villagers tokens for +1 Action each."""
-    count: int = 1
-
-
-Action = Union[
-    PlayAction, PlayTreasure, PlayAllTreasures, Buy, EndPhase, Choose, Resign, EndGame, Cheat,
-    SpendCoffers, SpendVillagers,
-]
+Action = Union[PlayAction, PlayTreasure, PlayAllTreasures, Buy, BuyEvent, SpendCoffers, SpendVillager, PayDebt, EndPhase, Choose, Resign, EndGame, Cheat]
 
 
 @dataclass(frozen=True)

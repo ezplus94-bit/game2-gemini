@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src" / "dominion"
 
 MUTATIONS = [
-    ("Bridge can make costs negative", "engine/costs.py", "return max(0, get_card(name).cost - state.cost_reduction)", "return get_card(name).cost - state.cost_reduction"),
+    ("Bridge can make costs negative", "engine/costs.py", "return max(0, card.cost - reduction)", "return card.cost - reduction"),
     ("Bridge reduction ignored when buying", "engine/game.py", "s.coins -= card_cost(s, card)", "s.coins -= get_card(card).cost"),
     ("Bridge reduction ignored by legal buys", "engine/rules.py", "card_cost(state, name) <= state.coins and not is_walled(state, name, actor)", "get_card(name).cost <= state.coins and not is_walled(state, name, actor)"),
     ("Bridge reduction survives the turn", "engine/game.py", "        s.cost_reduction = 0\n", "        pass\n"),

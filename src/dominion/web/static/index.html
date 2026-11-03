@@ -10,7 +10,10 @@
     --ink: #e8e9ee; --muted: #9aa0b2; --accent: #6cb4ff; --good: #3fb56b; --bad: #e0576a; --warn: #e3b341;
     --card-ink: #1d1d22; --shadow: 0 2px 8px rgba(0,0,0,.45);
     --c-action: #d9d4c3; --c-treasure: #f1cf61; --c-victory: #8fd19a; --c-curse: #c79be0;
-    --c-reaction: #8fbfee; --c-attack: #ee9f94; --c-catastrophe: #3a2229; --c-special: #8fe3d4; --c-prize: #f3b664;
+    --c-reaction: #8fbfee; --c-attack: #ee9f94; --c-catastrophe: #3a2229; --c-special: #8fe3d4; --c-event: #c9b8f0; --c-reserve: #dcc08c;
+    --c-project: #f2b6c9; --c-artifact: #e2c9a0;
+    --c-night: #8f99d8; --c-boon: #f0d98a; --c-hex: #b79ad6; --c-state: #c9ccd6;
+    --log-boon: #f0d98a; --log-hex: #c9a6ee;
     --log-play: #8fbfee; --log-treasure: #f1cf61; --log-buy: #6fdc8c; --log-gain: #9be0ae; --log-trash: #ee8f8f;
     --log-discard: #c1a98c; --log-draw: #a8b0c8; --log-reveal: #d8b4f0; --log-phase: #7c8499; --log-skip: #e3b341;
     --log-end: #ffd45e; --log-catastrophe: #ff6b6b; --log-summary: #8be0d4; --log-choice: #b9c0d4; --log-system: #9aa0b2;
@@ -21,6 +24,7 @@
     --shadow: 0 1px 4px rgba(0,0,0,.18);
     --log-play: #1f5fa8; --log-treasure: #8a6a00; --log-buy: #1e7a39; --log-gain: #2b8a3e; --log-trash: #b02a2a;
     --log-discard: #7a5f3a; --log-draw: #555d75; --log-reveal: #7a3fa0; --log-phase: #8a8f9e; --log-skip: #a97800;
+    --log-boon: #8a6a00; --log-hex: #7a3fa0;
     --log-end: #a06a00; --log-catastrophe: #c0152b; --log-summary: #0f7c70; --log-choice: #555d75; --log-system: #6b6d78;
   }
   * { box-sizing: border-box; }
@@ -199,6 +203,11 @@
   .log-line.k-buy .lt { color: var(--log-buy); font-weight: 700; }
   .log-line.k-gain .lt { color: var(--log-gain); }
   .log-line.k-trash .lt { color: var(--log-trash); }
+  .log-line.k-boon .lt { color: var(--log-boon); font-weight: 700; }
+  .log-line.k-hex .lt { color: var(--log-hex); font-weight: 700; }
+  #nocturne-panel .row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 3px 0; font-size: .78rem; }
+  #nocturne-panel .tag { cursor: pointer; border: 0; color: inherit; }
+  #nocturne-panel .tag.boon { background: var(--c-boon); color: #222; } #nocturne-panel .tag.hex { background: var(--c-hex); color: #222; }
   .log-line.k-discard .lt { color: var(--log-discard); }
   .log-line.k-draw .lt { color: var(--log-draw); }
   .log-line.k-reveal .lt { color: var(--log-reveal); font-style: italic; }
@@ -336,6 +345,29 @@
           <div class="row" id="expansion-row"></div>
         </div>
         <div class="panel">
+          <h2>Platinum &amp; Colony <span class="muted" style="text-transform:none;letter-spacing:0">(Prosperity)</span></h2>
+          <select id="colonies-select">
+            <option value="auto">Automatic: when a random Kingdom card is from Prosperity</option>
+            <option value="always">Always</option>
+            <option value="never">Never</option>
+          </select>
+        </div>
+        <div class="panel">
+          <h2>Events &amp; Landmarks <span class="muted" style="text-transform:none;letter-spacing:0">(Adventures, Empires)</span></h2>
+          <select id="events-select">
+            <option value="auto">Automatic: two Events or Landmarks when a Kingdom card is from Adventures or Empires</option>
+            <option value="never">Never</option>
+          </select>
+        </div>
+        <div class="panel">
+          <h2>Shelters <span class="muted" style="text-transform:none;letter-spacing:0">(Dark Ages)</span></h2>
+          <select id="shelters-select">
+            <option value="auto">Automatic: when a random Kingdom card is from Dark Ages</option>
+            <option value="always">Always (Hovel, Necropolis, Overgrown Estate instead of 3 Estates)</option>
+            <option value="never">Never</option>
+          </select>
+        </div>
+        <div class="panel">
           <h2>Cheat codes <span class="muted" style="text-transform:none;letter-spacing:0">(off by default)</span></h2>
           <label class="check"><input type="checkbox" id="cheats-box"> Allow cheat codes in this game</label>
           <p class="muted" id="cheats-note" style="margin:4px 0 0"></p>
@@ -370,6 +402,14 @@
         <div class="panel" id="supply-panel"><h2>Supply</h2>
           <div class="cards" id="supply-basic"></div>
           <div class="cards" id="supply-kingdom" style="margin-top:8px"></div>
+          <div id="offsupply-row" hidden>
+            <p class="muted" style="margin:6px 0 3px;font-size:.8rem">Not in the Supply (Prizes, Rewards, the Ferryman pile):</p>
+            <div class="cards" id="supply-offsupply"></div>
+          </div>
+          <div id="events-row" hidden>
+            <p class="muted" style="margin:6px 0 3px;font-size:.8rem">Events, Projects and Landmarks: buy an Event with a Buy and its cost (in $, or Debt). You do not gain it, it just does what it says. A Project is bought the same way but is an ability you keep for the rest of the game (you only have two cubes). Landmarks (marked) are standing rules and cannot be bought. A Way (marked) is a standing option: each time you play an Action you are asked whether to play it normally or use the Way instead.</p>
+            <div class="cards" id="supply-events"></div>
+          </div>
           <div id="catastrophe-row" hidden>
             <p class="muted" style="margin:6px 0 3px;font-size:.8rem">Catastrophe and Special cards: 2 of each, single use, never end the game.</p>
             <div class="cards" id="supply-catastrophe"></div>
@@ -382,6 +422,7 @@
       </div>
 
       <aside id="right-col" class="stack">
+        <div class="panel" id="nocturne-panel" hidden></div>
         <div class="panel" id="log-panel"><h2>Log</h2><div id="log"></div></div>
         <div id="chat-slot-game">
           <section id="chat" class="panel" hidden>
@@ -401,6 +442,9 @@
           <div id="resources"></div>
           <div class="row" id="controls">
             <button id="btn-treasures">Play all Treasures</button>
+            <button id="btn-coffers" hidden title="Spend Coffers tokens for +$1 each">Spend Coffers</button>
+            <button id="btn-villagers" hidden title="Spend Villager tokens for +1 Action each">Spend Villagers</button>
+            <button id="btn-debt" hidden title="Spend $ to remove Debt tokens (1 $ per token). You cannot buy while you owe Debt.">Pay off Debt</button>
             <button id="btn-end" class="primary">End phase</button>
             <button id="btn-undo" title="Ask the other players to let you take back your last action">Request undo</button>
           </div>
@@ -692,11 +736,18 @@
     if (types.includes("catastrophe")) return ["catastrophe"];
     if (types.includes("special")) return ["special"];
     if (types.includes("curse")) return ["curse"];
+    if (types.includes("event")) return ["event"];
+    if (types.includes("project")) return ["project"];
+    if (types.includes("artifact")) return ["artifact"];
+    if (types.includes("boon")) return ["boon"];
+    if (types.includes("hex")) return ["hex"];
+    if (types.includes("state")) return ["state"];
     const out = [];
-    if (types.includes("action")) out.push(types.includes("attack") ? "attack" : types.includes("reaction") ? "reaction" : "action");
-    if (types.includes("treasure")) out.push("treasure");
+    if (types.includes("action")) out.push(types.includes("attack") ? "attack" : types.includes("reaction") ? "reaction" : types.includes("reserve") ? "reserve" : "action");
+    if (types.includes("treasure")) { if (types.includes("reserve")) out.push("reserve"); out.push("treasure"); }
     if (types.includes("victory")) out.push("victory");
-    return out.length ? out : ["action"];
+    if (types.includes("night")) out.push("night");
+    return out.length ? out.slice(0, 2) : ["action"];
   }
   // on the face of a card: Catastrophe / Special cards need only that word; everything else lists its types
   function faceLabel(types) {
@@ -716,6 +767,7 @@
     return null;
   }
   function priceOf(info) {
+    if (info.types && (info.types.includes("event") || info.types.includes("project"))) return info.cost;       // Events and Projects are never cheaper
     const cut = view ? view.cost_reduction || 0 : 0;
     return Math.max(0, info.cost - cut);
   }
@@ -750,11 +802,11 @@
     c.appendChild(el("span", "name", blind ? "???" : faceName(name)));
     if (blind) {
       c.appendChild(el("span", "cost", "?"));
-    } else if (info.cost !== "?") {
+    } else if (info.cost !== "?" && !["landmark", "way", "boon", "hex", "state", "artifact"].some((t) => (info.types || []).includes(t))) {
       const price = priceOf(info);
       const cost = el("span", "cost" + (price < info.cost ? " cheaper" : ""));
       if (price < info.cost) cost.appendChild(el("s", "", String(info.cost)));
-      cost.appendChild(document.createTextNode(String(price) + (info.potion_cost ? "P" : "")));
+      cost.appendChild(document.createTextNode(info.debt_cost ? ((price ? String(price) + " " : "") + info.debt_cost + "D") : String(price) + (info.potion_cost ? "P" : "")));
       c.appendChild(cost);
     }
     if (extra.sub) c.appendChild(el("span", "sub", extra.sub));
@@ -849,7 +901,7 @@
       body.appendChild(cardEl(name, { size: "big" }));
       const t = el("div", "help-text");
       t.appendChild(el("p", "", info.text || ""));
-      const bits = ["Cost $" + info.cost + (info.potion_cost ? " + Potion" : ""), typeLabel(info.types)];
+      const bits = [info.types.includes("landmark") ? "Landmark" : info.types.includes("way") ? "Way" : ("Cost $" + info.cost + (info.potion_cost ? " + Potion" : "") + (info.debt_cost ? " + " + info.debt_cost + " Debt" : "")), typeLabel(info.types)];
       if (info.expansion) bits.push(info.expansion === "Catastrophe" ? "Catastrophe (house rule)" : info.expansion + " set");
       t.appendChild(el("p", "muted", bits.join("  |  ")));
       if (view) {
@@ -1075,6 +1127,15 @@
     $("btn-bot").disabled = lobby.players.length >= lobby.max_players;
     $("btn-start").disabled = lobby.players.length < lobby.min_players;
 
+    const colonySel = $("colonies-select");
+    colonySel.value = lobby.colonies === true ? "always" : lobby.colonies === false ? "never" : "auto";
+    colonySel.disabled = !isHost;
+    const shelterSel = $("shelters-select");
+    shelterSel.value = lobby.shelters === true ? "always" : lobby.shelters === false ? "never" : "auto";
+    shelterSel.disabled = !isHost;
+    const eventSel = $("events-select");
+    eventSel.value = lobby.events === false ? "never" : "auto";
+    eventSel.disabled = !isHost;
     // cheat codes
     const cb = $("cheats-box");
     cb.checked = !!lobby.cheats; cb.disabled = !isHost;
@@ -1170,16 +1231,28 @@
     };
     pill("Actions", v.actions); pill("Buys", v.buys); pill("Coins", "$" + v.coins, "coins"); pill("Turn", v.turn_number);
     if (v.has_potions) pill("Potions", v.potions, "coins");
+    if (v.debt > 0) pill("Debt", v.debt, "reduced");
+    if (v.trade_mat > 0) pill("Trade Route mat", v.trade_mat);
+    if (v.coffers > 0) pill("Coffers", v.coffers, "coins");
+    if (v.banned && v.banned.length) pill("Cannot buy", v.banned.join(", "), "reduced");
     if (v.cost_reduction > 0) pill("Cards cost", "-$" + v.cost_reduction, "reduced");
     if (v.midas) pill("Midas Touch", "Treasures = $3", "coins");
+    if (v.mission_turn) pill("Mission turn", "no buying cards", "reduced");
     if (isBlind()) pill("Blinded", "types only", "reduced");
     document.body.classList.toggle("blinded", isBlind());
 
     // buttons
     $("btn-treasures").hidden = !has("play_all_treasures");
+    $("btn-debt").hidden = !has("pay_debt");
+    $("btn-debt").textContent = "Pay off Debt (" + (v.debt || 0) + ")";
+    $("btn-coffers").hidden = !has("spend_coffers");
+    $("btn-coffers").textContent = "Spend Coffers (" + v.coffers + ")";
+    $("btn-villagers").hidden = !has("spend_villager");
+    $("btn-villagers").textContent = "Spend Villagers (" + (v.villagers || 0) + ")";
     const endBtn = $("btn-end");
     endBtn.hidden = !has("end_phase");
-    endBtn.textContent = v.phase === "action" ? "End Action phase" : "End turn";
+    const nightInHand = (v.hand || []).some((n) => ((cardInfo(n) || { types: [] }).types).includes("night"));
+    endBtn.textContent = v.phase === "action" ? "End Action phase" : (v.phase === "buy" && nightInHand) ? "End Buy phase" : "End turn";
     $("btn-trash").textContent = "Trash (" + v.trash.length + ")";
 
     // players
@@ -1201,9 +1274,36 @@
       if (p.bonus_coins > 0) tags.appendChild(el("span", "tag good", "gets $" + p.bonus_coins + " next turn"));
       if (p.invisible) tags.appendChild(el("span", "tag gold", "invisible"));
       if (p.pirate_tokens > 0) tags.appendChild(el("span", "tag gold", "Pirate Ship tokens: " + p.pirate_tokens));
+      if (p.vp_tokens > 0) tags.appendChild(el("span", "tag gold", "VP tokens: " + p.vp_tokens));
+      if (p.coffers > 0) tags.appendChild(el("span", "tag gold", "Coffers: " + p.coffers));
+      if (p.villagers > 0) tags.appendChild(el("span", "tag gold", "Villagers: " + p.villagers));
+      if (p.projects && p.projects.length) tags.appendChild(el("span", "tag", "Projects: " + p.projects.join(", ")));
+      if (p.plot_tokens > 0) tags.appendChild(el("span", "tag", "Sinister Plot: " + p.plot_tokens));
+      if (p.exile && p.exile.length) {                       // Menagerie: the Exile mat is face up
+        const counts = {}; p.exile.forEach((n) => { counts[n] = (counts[n] || 0) + 1; });
+        tags.appendChild(el("span", "tag gold", "Exile mat: " + Object.entries(counts).map(([n, c]) => c > 1 ? c + " " + n : n).join(", ")
+          + (p.invested && Object.keys(p.invested).length ? " (Invested: " + Object.entries(p.invested).map(([n, c]) => c + " " + n).join(", ") + ")" : "")));
+      }
+      if (p.delayed && p.delayed.length) tags.appendChild(el("span", "tag gold", "Set aside for next turn: " + p.delayed.join(", ")));
+      if (p.cargo_aside && p.cargo_aside.length) tags.appendChild(el("span", "tag gold", "Cargo Ship: " + p.cargo_aside.join(", ")));
+      if (p.research_aside > 0) tags.appendChild(el("span", "tag", "Research: " + p.research_aside + " card" + (p.research_aside > 1 ? "s" : "") + " set aside"));
+      Object.entries(v.artifacts || {}).forEach(([name, holder]) => { if (holder === v.players.indexOf(p)) tags.appendChild(el("span", "tag gold", "Artifact: " + name)); });
+      if (p.debt > 0) tags.appendChild(el("span", "tag bad", "Debt: " + p.debt));
+      if (p.archived > 0) tags.appendChild(el("span", "tag", "Archive: " + p.archived + " set aside"));
+      (p.states || []).forEach((s) => tags.appendChild(el("span", "tag " + (s === "Lost in the Woods" ? "gold" : "bad"), s)));
+      if (p.held_boons && p.held_boons.length) tags.appendChild(el("span", "tag gold", "saved Boon: " + p.held_boons.join(", ")));
+      if (p.crypt > 0) tags.appendChild(el("span", "tag", "Crypt: " + p.crypt + " Treasure" + (p.crypt > 1 ? "s" : "") + " set aside"));
+      if (p.ghosted && p.ghosted.length) tags.appendChild(el("span", "tag gold", "Ghost: " + p.ghosted.join(", ")));
+      if (p.enchanted > 0) tags.appendChild(el("span", "tag bad", "enchanted: first Action only +1 Card +1 Action"));
       if (p.island_mat && p.island_mat.length) tags.appendChild(el("span", "tag", "Island mat: " + p.island_mat.join(", ")));
       if (p.village_mat > 0) tags.appendChild(el("span", "tag", "Native Village mat: " + p.village_mat));
       if (p.haven > 0) tags.appendChild(el("span", "tag", "Haven: " + p.haven + " set aside"));
+      if (p.tavern && p.tavern.length) tags.appendChild(el("span", "tag gold", "Tavern mat: " + p.tavern.join(", ")));
+      if (p.inherited) tags.appendChild(el("span", "tag", "Estates play as " + p.inherited));
+      if (p.minus_card) tags.appendChild(el("span", "tag bad", "-1 Card token"));
+      if (p.minus_coin) tags.appendChild(el("span", "tag bad", "-$1 token"));
+      if (p.journey_up === false) tags.appendChild(el("span", "tag", "Journey token: face down"));
+      Object.entries(p.tokens || {}).forEach(([k, pile]) => tags.appendChild(el("span", "tag", k + " token on " + pile)));
       if (i !== v.current_player && p.in_play.length) tags.appendChild(el("span", "tag", "in play: " + p.in_play.join(", ")));
       if (p.possessed_by !== null && p.possessed_by !== undefined) tags.appendChild(el("span", "tag bad", "possessed by " + v.players[p.possessed_by].name));
       if (p.blind > 0) tags.appendChild(el("span", "tag blind", "blinded"));
@@ -1224,10 +1324,23 @@
       piles.set(p.name, p.count);
       const flash = prevPiles && prevPiles.has(p.name) && p.count < prevPiles.get(p.name);
       const walled = p.walled_by !== null && p.walled_by !== undefined;
-      const c = cardEl(p.name, { count: p.count, flash, sub: p.embargo ? "Embargo x" + p.embargo : undefined });
+      const tokenText = v.players.map((pl) => Object.entries(pl.tokens || {}).filter(([, pile]) => pile === (p.stack || p.name)).map(([k]) => pl.name + ": " + k + " token")).flat().join(", ");
+      const splitText = p.split ? Object.entries(p.split).map(([n, k]) => n + " " + k).join(" / ") : "";
+      const baseSub = p.embargo ? "Embargo x" + p.embargo : (p.bane ? "Bane" : (p.split ? splitText : (p.stack ? p.stack + " pile" : "")));
+      const vpText = p.pile_vp ? p.pile_vp + " VP on pile" : "";
+      const debtText = p.pile_debt ? p.pile_debt + " Debt on pile" : "";
+      const c = cardEl(p.name, { count: p.count, flash, sub: [baseSub, vpText, debtText, tokenText].filter(Boolean).join(" | ") || undefined });
       if (walled) { c.classList.add("walled"); c.title += "\nWalled off by " + v.players[p.walled_by].name + " until the start of their next turn."; }
       if (p.count === 0) c.classList.add("empty");
-      if (canBuy(p.name)) makeClickable(c, () => act({ type: "buy", card: p.name }));
+      if (canBuy(p.name)) makeClickable(c, () => {
+        const spare = v.coins - p.price;
+        if (p.overpay && spare > 0) {                       // Guilds: a card that may be overpaid for
+          const raw = window.prompt("Overpay for " + p.name + "? Extra $ to pay (0 to " + spare + ")", "0");
+          if (raw === null) return;
+          const extra = parseInt(raw, 10);
+          if (extra >= 0 && extra <= spare) act(extra > 0 ? { type: "buy", card: p.name, overpay: extra } : { type: "buy", card: p.name });
+        } else act({ type: "buy", card: p.name });
+      });
       else {
         makeInfoOnly(c);
         if (myTurn && v.phase === "buy" && !v.pending) c.classList.add("dim");
@@ -1235,6 +1348,42 @@
       (p.catastrophe ? cata : p.kingdom ? kingdom : basic).appendChild(c);
     });
     prevPiles = piles;
+    const off = $("supply-offsupply");
+    off.replaceChildren();
+    $("offsupply-row").hidden = !v.offsupply.length;
+    v.offsupply.forEach((p) => {                            // Prizes, Rewards and the Ferryman pile
+      const c = cardEl(p.name, { count: p.count, sub: p.ferryman ? "Ferryman pile" : undefined });
+      if (p.count === 0) c.classList.add("empty");
+      makeInfoOnly(c);
+      off.appendChild(c);
+    });
+
+    const evBox = $("supply-events");                       // Adventures Events
+    evBox.replaceChildren();
+    $("events-row").hidden = !((v.events && v.events.length) || (v.landmarks && v.landmarks.length) || (v.ways && v.ways.length));
+    (v.ways || []).forEach((w) => {                            // Menagerie Ways: each Action you play may use the Way instead of its own text
+      const c = cardEl(w.name, { sub: "Way" + (w.name === "Way of the Mouse" && v.mouse ? " | plays " + v.mouse : "") });
+      makeInfoOnly(c);
+      evBox.appendChild(c);
+    });
+    (v.landmarks || []).forEach((l) => {                       // Empires Landmarks: standing rules with VP pools
+      const bits = [];
+      if (l.vp !== null && l.vp !== undefined) bits.push(l.vp + " VP left");
+      if (l.obelisk) bits.push("pile: " + l.obelisk);
+      const c = cardEl(l.name, { sub: "Landmark" + (bits.length ? " | " + bits.join(" | ") : "") });
+      makeInfoOnly(c);
+      evBox.appendChild(c);
+    });
+    (v.events || []).forEach((e) => {
+      const owners = (e.owners || []).map((i) => v.players[i].name);
+      const c = cardEl(e.name, { sub: e.once ? (e.used ? "Once per turn: used" : "Once per turn") : (owners.length ? "Cubes: " + owners.join(", ") : undefined) });
+      if (has("buy_event", e.name)) makeClickable(c, () => act({ type: "buy_event", card: e.name }));
+      else {
+        makeInfoOnly(c);
+        if (myTurn && v.phase === "buy" && !v.pending) c.classList.add("dim");
+      }
+      evBox.appendChild(c);
+    });
 
     // in play (the current player's)
     const inplay = $("inplay");
@@ -1279,6 +1428,7 @@
     renderUndo(finished);
     updatePopupLayer();
     renderLog();
+    renderNocturne(v);
     processEvents(v, finished);
 
     // after an undo the move counter goes backwards: do not auto-play the position we just restored
@@ -1304,6 +1454,51 @@
       const at = v.version;
       setTimeout(() => { if (view && view.version === at && settings.autoEnd) act({ type: "end_phase" }); }, 700);
     }
+  }
+
+  // ------------------------------------------------------------ Nocturne: Boons and Hexes
+  function renderNocturne(v) {
+    const panel = $("nocturne-panel");
+    const n = v.nocturne;
+    const artifacts = Object.keys(v.artifacts || {});
+    panel.hidden = !n && !artifacts.length;
+    if (panel.hidden) return;
+    panel.replaceChildren(el("h2", "", n ? (artifacts.length ? "Boons, Hexes and Artifacts" : "Boons and Hexes") : "Artifacts"));
+    const chips = (label, names, kind) => {
+      const row = el("div", "row");
+      row.appendChild(el("span", "", label));
+      if (!names.length) row.appendChild(el("span", "muted", "none"));
+      names.forEach((name) => {
+        const b = el("button", "tag " + kind, name);
+        b.type = "button"; b.title = (cardInfo(name) || {}).text || "";
+        b.addEventListener("click", () => openCardHelp(name));
+        row.appendChild(b);
+      });
+      panel.appendChild(row);
+    };
+    artifacts.forEach((name) => {
+      const holder = v.artifacts[name];
+      const row = el("div", "row");
+      const b = el("button", "tag boon", name);
+      b.type = "button"; b.title = (cardInfo(name) || {}).text || "";
+      b.addEventListener("click", () => openCardHelp(name));
+      row.appendChild(b);
+      row.appendChild(el("span", "muted", holder === null || holder === undefined ? "nobody has it" : v.players[holder].name + " has it"));
+      panel.appendChild(row);
+    });
+    if (!n) return;
+    if (n.druid_boons.length || n.boons_left || n.boons_discard.length || n.kept_boons.length) {
+      panel.appendChild(el("div", "row", "Boons deck: " + n.boons_left + " card" + (n.boons_left === 1 ? "" : "s")));
+      if (n.druid_boons.length) chips("Druid's Boons:", n.druid_boons, "boon");
+      if (n.kept_boons.length) chips("Kept until Clean-up:", n.kept_boons, "boon");
+      chips("Boons discard:", n.boons_discard, "boon");
+    }
+    if (n.hexes_left || n.hexes_discard.length) {
+      panel.appendChild(el("div", "row", "Hexes deck: " + n.hexes_left + " card" + (n.hexes_left === 1 ? "" : "s")));
+      chips("Hexes discard:", n.hexes_discard, "hex");
+    }
+    if (n.deluded_turn) panel.appendChild(el("div", "row", "Deluded this turn: no Action cards can be bought."));
+    if (n.envious_turn) panel.appendChild(el("div", "row", "Envious this turn: Silver and Gold make $1."));
   }
 
   // ------------------------------------------------------------ log
@@ -1552,6 +1747,9 @@
   $("btn-settings").addEventListener("click", openSettings);
   $("btn-game").addEventListener("click", openGameMenu);
   $("cheats-box").addEventListener("change", (e) => send({ type: "set_cheats", cheats: e.target.checked }));
+  $("events-select").addEventListener("change", (e) => send({ type: "set_events", events: e.target.value === "never" ? false : null }));
+  $("shelters-select").addEventListener("change", (e) => send({ type: "set_shelters", shelters: e.target.value === "always" ? true : e.target.value === "never" ? false : null }));
+  $("colonies-select").addEventListener("change", (e) => send({ type: "set_colonies", colonies: e.target.value === "always" ? true : e.target.value === "never" ? false : null }));
   
   
   $("btn-undo").addEventListener("click", () => send({ type: "undo_request" }));
@@ -1561,6 +1759,24 @@
   $("btn-chat").addEventListener("click", sendChat);
   $("chat-input").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
   $("btn-treasures").addEventListener("click", () => act({ type: "play_all_treasures" }));
+  $("btn-coffers").addEventListener("click", () => {
+    const max = view ? view.coffers : 0;
+    const raw = max > 1 ? window.prompt("How many Coffers tokens do you spend, for +$1 each? (1 to " + max + ")", String(max)) : "1";
+    const n = parseInt(raw, 10);
+    if (n >= 1 && n <= max) act({ type: "spend_coffers", count: n });
+  });
+  $("btn-villagers").addEventListener("click", () => {
+    const max = view ? view.villagers || 0 : 0;
+    const raw = max > 1 ? window.prompt("How many Villagers do you spend, for +1 Action each? (1 to " + max + ")", "1") : "1";
+    const n = parseInt(raw, 10);
+    if (n >= 1 && n <= max) act({ type: "spend_villager", count: n });
+  });
+  $("btn-debt").addEventListener("click", () => {
+    const max = Math.min(view ? view.debt : 0, view ? view.coins : 0);
+    const raw = max > 1 ? window.prompt("How many Debt tokens do you pay off, for $1 each? (1 to " + max + ")", String(max)) : "1";
+    const n = parseInt(raw, 10);
+    if (n >= 1 && n <= max) act({ type: "pay_debt", count: n });
+  });
   $("btn-end").addEventListener("click", () => act({ type: "end_phase" }));
   $("btn-rematch").addEventListener("click", () => send({ type: "rematch" }));
   $("auto-treasures").addEventListener("change", (e) => { settings.autoTreasures = e.target.checked; saveSettings(); if (view) renderGame(); });

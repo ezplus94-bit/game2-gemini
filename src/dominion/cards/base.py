@@ -19,11 +19,38 @@ class CardType(str, Enum):
     CURSE = "curse"
     ATTACK = "attack"
     REACTION = "reaction"
+    PRIZE = "prize"                  # Cornucopia (first edition): not in the Supply, gained with Tournament
+    REWARD = "reward"                # Cornucopia & Guilds: not in the Supply, gained with Joust
     DURATION = "duration"            # Seaside: stays in play until the start of its owner's next turn
-    PRIZE = "prize"                  # Cornucopia: non-Supply Prize cards gained from Tournament
     CATASTROPHE = "catastrophe"      # optional high-impact house-rule cards
     SPECIAL = "special"              # optional single-use house-rule cards that help a player
-    # Future: DURATION ...
+    RUINS = "ruins"                  # Dark Ages: the mixed Ruins pile
+    LOOTER = "looter"                # Dark Ages: Death Cart, Marauder, Cultist (their Attacks give out Ruins)
+    KNIGHT = "knight"                # Dark Ages: the ten Knights share one pile
+    SHELTER = "shelter"              # Dark Ages: Hovel, Necropolis, Overgrown Estate replace the starting Estates
+    RESERVE = "reserve"              # Adventures: goes to the Tavern mat when played; may be called later
+    TRAVELLER = "traveller"          # Adventures: may be exchanged for the next card of its line when discarded from play
+    EVENT = "event"                  # Adventures & Empires: bought with a Buy, never gained
+    LANDMARK = "landmark"            # Empires: a standing rule for the whole game (VP pools, end-of-game scoring)
+    COMMAND = "command"              # Empires: Overlord plays another Action from the Supply
+    GATHERING = "gathering"          # Empires: puts VP tokens on its own Supply pile (Temple, Wild Hunt, Farmers' Market)
+    CASTLE = "castle"                # Empires: the eight Castles share one pile
+    NIGHT = "night"                  # Nocturne: played in the Night phase (after the Buy phase), not in the Action phase
+    FATE = "fate"                    # Nocturne: gives out Boons (the Boons are shuffled when a Fate card is in the game)
+    DOOM = "doom"                    # Nocturne: gives out Hexes
+    SPIRIT = "spirit"                # Nocturne: Will-o'-Wisp, Imp, Ghost (piles outside the Supply)
+    ZOMBIE = "zombie"                # Nocturne: the three Zombies that Necromancer plays from the trash
+    HEIRLOOM = "heirloom"            # Nocturne: replaces a starting Copper (Haunted Mirror, Goat, Lucky Coin...)
+    PROJECT = "project"              # Renaissance: bought with a Buy and its cost in $, a permanent ability for the buyer
+    WAY = "way"                      # Menagerie: a standing option for every Action you play (do the Way instead of what the card says)
+    ALLY = "ally"                    # Allies: one per game when a Liaison is in the Kingdom; says what Favors can be spent on
+    LIAISON = "liaison"              # Allies: gives Favor tokens
+    AUGUR = "augur"                  # Allies: the four cards of the Augurs split pile
+    CLASH = "clash"                  # Allies: the Clashes
+    FORT = "fort"                    # Allies: the Forts
+    ODYSSEY = "odyssey"              # Allies: the Odysseys
+    TOWNSFOLK = "townsfolk"          # Allies: the Townsfolk
+    WIZARD = "wizard"                # Allies: the Wizards
 
 
 # An effect takes an EffectContext. It is either a plain function (no player
@@ -64,18 +91,33 @@ class CardDef:
     can_buy_fn: Optional[Callable] = None        # ``fn(state) -> reason or None``: why this card cannot be bought right now
     cost_mod: Optional[Callable] = None          # ``fn(state) -> int``: coins this card costs less right now (Peddler)
     play_at_turn_start: bool = False             # may be played from the hand at the start of its owner's turn (Clerk)
-    on_discard: Optional[EffectFn] = None        # Hinterlands: runs when discarded outside of Clean-up (Tunnel, Trail, Weaver)
-    on_trash: Optional[EffectFn] = None          # Hinterlands: runs when trashed (Nomads)
-    on_other_gain_reaction: Optional[EffectFn] = None  # Hinterlands: Reaction in hand when another player gains a card (Fool's Gold, Guard Dog)
-    overpay: bool = False                        # Guilds: may overpay coins when buying this card
-    on_overpay: Optional[Callable] = None        # Guilds: ``fn(ctx, amount)`` run when overpaid on buy
-    on_buy_in_play: Optional[Callable] = None    # Guilds: ``fn(ctx, card_name)`` run when buying a card while this is in play
+    overpay: bool = False                        # may be overpaid for when bought (Guilds); the "+" in its cost
+    on_overpay: Optional[EffectFn] = None        # "Overpay:" effect, runs when the card is gained after an overpayment: ``fn(ctx, event)``
+    cost_aura: int = 0                           # while this is in play, ALL cards cost this many coins less (Princess)
+    on_other_gain: Optional[EffectFn] = None     # Reaction in hand to ANOTHER player's gain (Fool's Gold): ``fn(ctx, event)``, ctx.player = the reactor
+    gain_replacement: str = ""                   # Reaction in hand: "when you would gain a card", gain this card instead (Trader: Silver)
+    on_trash: Optional[EffectFn] = None          # "when you trash this": ``fn(ctx, event)``, ctx.player = the card's owner (Dark Ages)
+    on_trash_reaction: Optional[EffectFn] = None  # Reaction in hand to one of its owner's cards being trashed (Market Square): ``fn(ctx, event)``
+
+    call_when: str = ""                          # Adventures Reserve: "start" (of turn), "after_action", "gain" or "buy_end"
+    call_cond: Optional[Callable] = None         # ``fn(ctx, arg) -> bool``: may it be called right now?
+    call_fn: Optional[EffectFn] = None           # what calling it does: ``fn(ctx, arg)`` (``arg``: the Action just played / the gain event)
+    call_prompt: str = ""                        # question shown to the player
+    call_discards: bool = False                  # calling it discards it from the mat instead of putting it into play (Wine Merchant)
+    on_buy_by_other: Optional[EffectFn] = None   # while in play: when another player buys a card, ``fn(ctx, event)`` (Haunted Woods, Swamp Hag)
+    exchange: str = ""                           # Traveller: the card it may be exchanged for when discarded from play
+    once_per_turn: bool = False                  # Event: may be bought only once each turn
+    debt_cost: int = 0                           # Empires: Debt tokens taken when this is bought (the "D" in a cost)
+    heirloom: str = ""                           # Nocturne: the Heirloom that replaces one starting Copper in games using this card
+    gains_to_hand: bool = False                  # Nocturne: "this is gained to your hand (instead of your discard pile)"
 
     def __post_init__(self) -> None:
         if not self.name:
             raise ValueError("A card needs a name.")
         if self.cost < 0:
             raise ValueError(f"{self.name}: cost cannot be negative.")
+        if self.debt_cost < 0:
+            raise ValueError(f"{self.name}: debt cost cannot be negative.")
         if self.potion_cost < 0:
             raise ValueError(f"{self.name}: potion cost cannot be negative.")
         if CardType.ACTION in self.types and self.on_play is None:
@@ -105,18 +147,15 @@ def treasure(
     on_gain: Optional[EffectFn] = None,
     on_gain_in_play: Optional[EffectFn] = None,
     can_buy_fn: Optional[Callable] = None,
-    extra_types: tuple = (),
-    on_other_gain_reaction: Optional[EffectFn] = None,
     overpay: bool = False,
-    on_overpay: Optional[Callable] = None,
+    on_overpay: Optional[EffectFn] = None,
 ) -> CardDef:
     """A Treasure. ``on_play`` is a Treasure's extra effect (run when it is played in the Buy phase)."""
     return CardDef(
-        name, cost, frozenset({CardType.TREASURE, *extra_types}), coins=coins, on_play=on_play,
+        name, cost, frozenset({CardType.TREASURE}), coins=coins, on_play=on_play,
         text=f"${coins}" if text is None else text,
         potion_cost=potion_cost, potions=potions, coins_fn=coins_fn, kingdom=kingdom, expansion=expansion,
         on_gain=on_gain, on_gain_in_play=on_gain_in_play, can_buy_fn=can_buy_fn,
-        on_other_gain_reaction=on_other_gain_reaction,
         overpay=overpay, on_overpay=on_overpay,
     )
 
@@ -130,29 +169,11 @@ def victory(
     kingdom: bool = False,
     expansion: str = "Base",
     potion_cost: int = 0,
-    on_gain: Optional[EffectFn] = None,
 ) -> CardDef:
     return CardDef(
         name, cost, frozenset({CardType.VICTORY}),
         vp=vp, score_fn=score_fn, text=text or f"{vp} VP", kingdom=kingdom, expansion=expansion,
-        potion_cost=potion_cost, on_gain=on_gain,
-    )
-
-
-def victory_reaction(
-    name: str,
-    cost: int,
-    vp: int = 0,
-    text: str = "",
-    kingdom: bool = True,
-    expansion: str = "Base",
-    on_discard: Optional[EffectFn] = None,
-) -> CardDef:
-    """A card that is both a Victory and a Reaction card (Tunnel)."""
-    return CardDef(
-        name, cost, frozenset({CardType.VICTORY, CardType.REACTION}),
-        vp=vp, text=text or f"{vp} VP", kingdom=kingdom, expansion=expansion,
-        on_discard=on_discard,
+        potion_cost=potion_cost,
     )
 
 
@@ -177,12 +198,10 @@ def action(
     cost_mod: Optional[Callable] = None,
     play_at_turn_start: bool = False,
     on_gain_in_play: Optional[EffectFn] = None,
-    on_discard: Optional[EffectFn] = None,
-    on_trash: Optional[EffectFn] = None,
-    on_other_gain_reaction: Optional[EffectFn] = None,
     overpay: bool = False,
-    on_overpay: Optional[Callable] = None,
-    on_buy_in_play: Optional[Callable] = None,
+    on_overpay: Optional[EffectFn] = None,
+    on_trash: Optional[EffectFn] = None,
+    on_trash_reaction: Optional[EffectFn] = None,
 ) -> CardDef:
     """An Action card. ``extra_types`` adds e.g. CardType.ATTACK / REACTION."""
     return CardDef(
@@ -193,8 +212,7 @@ def action(
         potion_cost=potion_cost, on_cleanup=on_cleanup, cleanup_order=cleanup_order,
         on_gain=on_gain, on_gain_reaction=on_gain_reaction, can_buy_fn=can_buy_fn, cost_mod=cost_mod,
         play_at_turn_start=play_at_turn_start, on_gain_in_play=on_gain_in_play,
-        on_discard=on_discard, on_trash=on_trash, on_other_gain_reaction=on_other_gain_reaction,
-        overpay=overpay, on_overpay=on_overpay, on_buy_in_play=on_buy_in_play,
+        overpay=overpay, on_overpay=on_overpay, on_trash=on_trash, on_trash_reaction=on_trash_reaction,
     )
 
 

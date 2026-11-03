@@ -1,10 +1,10 @@
 from .base import CardDef, CardType, action, action_victory, treasure, treasure_victory, victory
 from .registry import (
-    UnknownCardError, expansions, get_card, kingdom_cards, prize_cards, register, unregister,
+    UnknownCardError, event_cards, expansions, get_card, kingdom_cards, landmark_cards, project_cards, register, unregister, way_cards, ally_cards,
 )
-from . import basic, kingdom, alchemy, seaside, prosperity, hinterlands, cornucopia, guilds  # noqa: F401  (importing these registers the cards)
+from . import basic, kingdom, alchemy, seaside, prosperity, cornucopia, hinterlands, dark_ages, adventures, empires, nocturne, renaissance, menagerie, allies  # noqa: F401  (importing these registers the cards)
 
 __all__ = [
     "CardDef", "CardType", "action", "action_victory", "treasure", "treasure_victory", "victory",
-    "UnknownCardError", "expansions", "get_card", "kingdom_cards", "prize_cards", "register", "unregister",
+    "UnknownCardError", "event_cards", "landmark_cards", "project_cards", "way_cards", "ally_cards", "expansions", "get_card", "kingdom_cards", "register", "unregister",
 ]

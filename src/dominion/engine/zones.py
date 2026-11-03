@@ -6,11 +6,11 @@ from typing import Optional
 
 from ..cards import CardType, get_card
 from .constants import HAND_SIZE
-from .costs import is_walled
-from .state import DiscardEvent, GainEvent, GameState
+from .costs import is_buried, is_walled
+from .state import GainEvent, GameState, TrashEvent
 
 # Zones a card can be moved between. "trash" is shared; the rest are per player.
-PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "island_mat", "village_mat", "haven", "horse_traders")
+PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "island_mat", "village_mat", "haven", "farmhands", "joust_aside", "tavern", "saved", "archived", "crypt", "ghosted", "hounds", "cargo_aside", "research_aside", "exile", "delayed")
 
 
 def beneficiary(state: GameState, player_index: int) -> int:
@@ -28,10 +28,10 @@ def send_to_trash(state: GameState, player_index: int, card: str) -> None:
         state.possession_aside.append(card)
     else:
         state.trash.append(card)
-    hook = get_card(card).on_trash
-    if hook is not None:
-        from .effects import EffectContext
-        hook(EffectContext(state, player_index, card))
+        if player_index == state.current_player:
+            state.players[player_index].trashed_turn += 1         # Menagerie: Goatherd counts what the player on its owner's right trashed
+        priest = state.turn_counts.get("ren:priest", 0) if player_index == state.current_player else 0        # Renaissance: Priest
+        state.trash_events.append(TrashEvent(player_index, card, priest))       # "when you trash this" (Dark Ages)
 
 
 def return_possession_cards(state: GameState) -> int:
@@ -43,7 +43,7 @@ def return_possession_cards(state: GameState) -> int:
     return count
 
 
-def take_top_cards(state: GameState, player_index: int, count: int) -> list:
+def take_top_cards(state: GameState, player_index: int, count: int, star: bool = False) -> list:
     """Remove up to ``count`` cards from the top of the deck (top first),
     reshuffling the discard pile when the deck runs out. The cards are returned,
     not placed anywhere: the caller must put them somewhere."""
@@ -53,16 +53,28 @@ def take_top_cards(state: GameState, player_index: int, count: int) -> list:
         if not player.deck:
             if not player.discard:
                 break
+            state.shuffles += 1
+            if star and state.ally in ("Order of Astrologers", "Order of Masons") and player.favors > 0:      # Allies: stop BEFORE the shuffle
+                state.star_draws.append([player_index, count - len(taken), "ally"])
+                break
             shuffled, player.discard = player.discard, []
             state.rng.shuffle(shuffled)
             player.deck = shuffled
+            if star and "Star Chart" in player.projects:       # Renaissance: stop to let the owner pick the top card, then finish the draw
+                state.star_draws.append([player_index, count - len(taken)])
+                break
         taken.append(player.deck.pop())
     return taken
 
 
 def draw_cards(state: GameState, player_index: int, count: int) -> list:
     """Draw up to ``count`` cards into the hand. Returns the cards drawn."""
-    drawn = take_top_cards(state, player_index, count)
+    player = state.players[player_index]
+    if count >= 1 and player.minus_card:              # Adventures: the -1 Card token makes the next draw one card smaller
+        player.minus_card = False
+        count -= 1
+        state.log.append(f"{player.name}'s -1 Card token is used: one card fewer is drawn.", "info", 1)
+    drawn = take_top_cards(state, player_index, count, star=True)
     state.players[player_index].hand.extend(drawn)
     return drawn
 
@@ -80,21 +92,43 @@ def move_card(state: GameState, player_index: int, card: str, source: str, desti
         send_to_trash(state, player_index, card)
     else:
         getattr(player, destination).append(card)
-        if destination == "discard" and not state.in_cleanup and get_card(card).on_discard is not None:
-            state.discard_events.append(DiscardEvent(player_index, card))
+
+
+def note_gain(state: GameState, card: str) -> None:
+    """Menagerie: Wayfarer costs the same as the last OTHER card gained this turn (by any player)."""
+    if card != "Wayfarer":
+        state.last_gain = card
+
+
+def exile_from_supply(state: GameState, player_index: int, card: str) -> bool:
+    """Menagerie: put a card from a Supply pile onto a player's Exile mat. This is not gaining it. False if the pile is empty
+    or the card is buried in a mixed pile (only the top card of Knights / Castles / split piles can be taken)."""
+    if state.supply.get(card, 0) <= 0 or is_buried(state, card):
+        return False
+    state.supply[card] -= 1
+    if card in state.stack_of:
+        state.stacks[state.stack_of[card]].pop(0)
+    state.players[player_index].exile.append(card)
+    return True
 
 
 def gain_card(state: GameState, player_index: int, card: str, destination: str = "discard") -> bool:
     """Move a card from the supply to a player's zone. False if the pile is empty or walled off (Fortnite).
     During a Possession turn a card the possessed player would gain goes to the possessor's discard pile."""
     taker = beneficiary(state, player_index)
+    to_hand = destination == "discard" and taker == player_index and get_card(card).gains_to_hand     # Nocturne: "this is gained to your hand"
     if taker != player_index:
         player_index, destination = taker, "discard"
-    if state.supply.get(card, 0) <= 0 or is_walled(state, card, player_index):
+    if state.supply.get(card, 0) <= 0 or is_walled(state, card, player_index) or is_buried(state, card):
         return False
+    if to_hand:
+        destination = "hand"
     if destination not in ("discard", "hand", "deck"):
         raise ValueError(f"Unknown destination: {destination}")
     state.supply[card] -= 1
+    note_gain(state, card)
+    if card in state.stack_of:                       # Knights / Ruins: the top card of the mixed pile leaves it
+        state.stacks[state.stack_of[card]].pop(0)
     player = state.players[player_index]
     getattr(player, destination).append(card)
     player.gained.append(card)
@@ -103,33 +137,37 @@ def gain_card(state: GameState, player_index: int, card: str, destination: str =
     if card in state.trade_tokens:                   # Trade Route: the pile's token moves to the mat
         state.trade_tokens.discard(card)
         state.trade_mat += 1
-    act_num = 0
-    if get_card(card).is_type(CardType.ACTION) and player_index == state.current_player:
-        state.actions_gained_this_turn += 1
-        act_num = state.actions_gained_this_turn
-    state.gain_events.append(
-        GainEvent(player_index, card, destination, bought=state.buying, action_gain_number=act_num)
-    )
+    if state.phase.value == "buy" and state.current_player == player_index:
+        player.buy_gains += 1                        # Merchant Guild counts what is gained in the Buy phase
+    state.gain_events.append(GainEvent(player_index, card, destination, bought=state.buying, overpaid=state.overpaid,
+                                       nth=len(player.gained_turn) if state.current_player == player_index else 0,
+                                       buy_phase=state.phase.value == "buy" and state.current_player == player_index))
     state.buying = False                             # only the first gain of a purchase is the bought card
+    state.overpaid = 0
     return True
 
 
-def gain_prize(state: GameState, player_index: int, card: str, destination: str = "deck") -> bool:
-    """Move a Prize card from the non-Supply Prize pile to a player's zone (Tournament)."""
-    if card not in state.prizes:
-        return False
+def gain_offsupply(state: GameState, player_index: int, card: str, destination: str = "discard") -> bool:
+    """Gain a card from a pile that is not in the Supply (Prizes, Rewards, the Ferryman pile). False if it is empty."""
     taker = beneficiary(state, player_index)
     if taker != player_index:
         player_index, destination = taker, "discard"
+    if state.offsupply.get(card, 0) <= 0:
+        return False
     if destination not in ("discard", "hand", "deck"):
         raise ValueError(f"Unknown destination: {destination}")
-    state.prizes.remove(card)
+    state.offsupply[card] -= 1
+    note_gain(state, card)
     player = state.players[player_index]
     getattr(player, destination).append(card)
     player.gained.append(card)
     if state.current_player == player_index:
         player.gained_turn.append(card)
-    state.gain_events.append(GainEvent(player_index, card, destination, bought=False, from_supply=False))
+    if state.phase.value == "buy" and state.current_player == player_index:
+        player.buy_gains += 1
+    state.gain_events.append(GainEvent(player_index, card, destination, from_supply=False,
+                                       nth=len(player.gained_turn) if state.current_player == player_index else 0,
+                                       buy_phase=state.phase.value == "buy" and state.current_player == player_index))
     return True
 
 
@@ -143,24 +181,21 @@ def gain_from_trash(state: GameState, player_index: int, card: str, destination:
     if destination not in ("discard", "hand", "deck"):
         raise ValueError(f"Unknown destination: {destination}")
     state.trash.remove(card)
+    note_gain(state, card)
     player = state.players[player_index]
     getattr(player, destination).append(card)
     player.gained.append(card)
     if state.current_player == player_index:
         player.gained_turn.append(card)
-    act_num = 0
-    if get_card(card).is_type(CardType.ACTION) and player_index == state.current_player:
-        state.actions_gained_this_turn += 1
-        act_num = state.actions_gained_this_turn
-    state.gain_events.append(
-        GainEvent(player_index, card, destination, from_supply=False, action_gain_number=act_num)
-    )
+    state.gain_events.append(GainEvent(player_index, card, destination, from_supply=False,
+                                       nth=len(player.gained_turn) if state.current_player == player_index else 0,
+                                       buy_phase=state.phase.value == "buy" and state.current_player == player_index))
     return True
 
 
 def return_to_supply(state: GameState, player_index: int, card: str) -> bool:
     """Move a card from a player's hand back to its Supply pile (Ambassador). False if the game has no such pile."""
-    if card not in state.supply:
+    if card not in state.supply or card in state.stack_of:
         return False
     state.players[player_index].hand.remove(card)
     state.supply[card] += 1
@@ -168,7 +203,17 @@ def return_to_supply(state: GameState, player_index: int, card: str) -> bool:
 
 
 def trash_from_supply(state: GameState, card: str) -> bool:
-    """Move a card from a supply pile to the trash. False if the pile is empty."""
+    """Move a card from a supply pile to the trash. False if the pile is empty.
+    A card of a split pile or the Castles can be trashed from the Supply only while it is on top of its pile (Gladiator)."""
+    if card in state.stack_of:
+        pile = state.stack_of[card]
+        stack = state.stacks.get(pile) or []
+        if pile in state.stacks and pile not in ("Knights", "Ruins") and stack and stack[0] == card and state.supply.get(card, 0) > 0:
+            stack.pop(0)
+            state.supply[card] -= 1
+            state.trash.append(card)
+            return True
+        return False
     if state.supply.get(card, 0) <= 0:
         return False
     state.supply[card] -= 1
@@ -207,6 +252,29 @@ def give_card(state: GameState, card: str, source: int, target: int) -> None:
 
 def discard_from_hand(state: GameState, player_index: int, card: str) -> None:
     move_card(state, player_index, card, "hand", "discard")
+    tunnel_discarded(state, player_index, card)
+
+
+def tunnel_discarded(state: GameState, player_index: int, card: str) -> None:
+    """\"When you discard this other than during Clean-up\" effects that need no decision. Cleanup discards never come through here.
+
+    Hinterlands: a Tunnel may be revealed to gain a Gold (always worth it, so it is revealed automatically).
+    Nocturne: a Faithful Hound may be set aside and put into its owner's hand at end of turn (never worse than leaving it
+    in the discard pile, so it is set aside automatically). The card has just been put on top of the discard pile."""
+    if state.status.value != "active":
+        return
+    if card == "Tunnel":
+        state.log.append(f"{state.players[player_index].name} reveals Tunnel.", "reveal", 1)
+        if gain_card(state, player_index, "Gold"):
+            state.log.append(f"{state.players[beneficiary(state, player_index)].name} gains Gold.", "gain", 1)
+    elif card == "Village Green" and not state.cleanup_active:
+        state.discard_events.append((player_index, card))      # Menagerie: Village Green may be played when discarded (asked in Game._settle)
+    elif card == "Faithful Hound" and not state.cleanup_active:
+        player = state.players[player_index]
+        if "Faithful Hound" in player.discard:
+            player.discard.pop(len(player.discard) - 1 - player.discard[::-1].index("Faithful Hound"))
+            player.hounds.append("Faithful Hound")
+            state.log.append(f"{player.name} sets Faithful Hound aside; it returns to their hand at end of turn.", "reveal", 1)
 
 
 def trash_from_hand(state: GameState, player_index: int, card: str) -> None:

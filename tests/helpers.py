@@ -31,9 +31,10 @@ def to_buy_phase(game):
 
 
 def total_cards(game):
-    """Every card in the game: supply + trash + all player zones (+ cards set aside by Possession)."""
+    """Every card in the game: supply + piles outside the Supply + trash + all player zones (+ cards set aside by Possession)."""
     s = game.state
-    return sum(s.supply.values()) + len(s.trash) + len(s.possession_aside) + sum(len(p.all_cards()) for p in s.players)
+    return (sum(s.supply.values()) + sum(s.offsupply.values()) + len(s.trash) + len(s.possession_aside)
+            + sum(len(p.all_cards()) + (1 if p.inherited else 0) for p in s.players))      # (Inheritance's set-aside card is on its owner's Estate mat)
 
 
 def snapshot(game):

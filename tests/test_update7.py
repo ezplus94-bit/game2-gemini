@@ -367,8 +367,8 @@ def test_host_chooses_card_sets_in_the_lobby():
         m = RoomManager(bot_delay=0)
         host, guest, _ = await two_player_room(m)
         lobby = host.last("lobby")
-        assert lobby["expansions"] == ["Base", "Alchemy", "Intrigue", "Seaside"] and lobby["available_expansions"] == ["Base", "Alchemy", "Intrigue", "Seaside"]
-        assert {c["expansion"] for c in lobby["available"]} == {"Base", "Alchemy", "Intrigue", "Seaside"} and len(lobby["available"]) == 90
+        assert lobby["expansions"] == ["Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Prosperity", "Renaissance", "Seaside"] and lobby["available_expansions"] == ["Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Prosperity", "Renaissance", "Seaside"]
+        assert {c["expansion"] for c in lobby["available"]} == {"Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Prosperity", "Renaissance", "Seaside"} and len(lobby["available"]) == 391
         await guest.say(type="set_expansions", expansions=["Base"])
         assert guest.last_error() == "Only the host can do that."
         for bad in ([], ["Nope"], ["Base", "Base"], "Base", None, [1], ["Base", "Nope"]):
@@ -429,7 +429,7 @@ def kingdom_all():
 def test_readme_update_history_covers_every_update():
     from pathlib import Path
     text = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
-    for n in range(1, 13):
+    for n in range(1, 15):
         assert f"### Update {n}:" in text
 
 

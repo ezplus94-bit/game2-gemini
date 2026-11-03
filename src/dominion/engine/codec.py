@@ -9,12 +9,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from .actions import (
-    Action, Buy, Choose, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, SpendCoffers, SpendVillagers,
-)
+from .actions import Action, Buy, BuyEvent, Choose, EndPhase, PayDebt, PlayAction, PlayAllTreasures, PlayTreasure, SpendCoffers, SpendVillager
 
 MAX_SELECTION = 50
 MAX_NAME_LENGTH = 60
+MAX_OVERPAY = 1000
 
 
 def action_to_dict(action: Action) -> dict:
@@ -25,15 +24,22 @@ def action_to_dict(action: Action) -> dict:
     if isinstance(action, PlayAllTreasures):
         return {"type": "play_all_treasures"}
     if isinstance(action, Buy):
-        return {"type": "buy", "card": action.card}
+        out = {"type": "buy", "card": action.card}
+        if action.overpay:
+            out["overpay"] = action.overpay
+        return out
+    if isinstance(action, BuyEvent):
+        return {"type": "buy_event", "card": action.card}
+    if isinstance(action, SpendCoffers):
+        return {"type": "spend_coffers", "count": action.count}
+    if isinstance(action, SpendVillager):
+        return {"type": "spend_villager", "count": action.count}
+    if isinstance(action, PayDebt):
+        return {"type": "pay_debt", "count": action.count}
     if isinstance(action, EndPhase):
         return {"type": "end_phase"}
     if isinstance(action, Choose):
         return {"type": "choose", "selection": list(action.selection)}
-    if isinstance(action, SpendCoffers):
-        return {"type": "spend_coffers", "count": action.count}
-    if isinstance(action, SpendVillagers):
-        return {"type": "spend_villagers", "count": action.count}
     raise ValueError(f"Cannot encode action: {action!r}")
 
 
@@ -55,7 +61,27 @@ def action_from_dict(data: Any) -> Action:
     if kind == "play_all_treasures":
         return PlayAllTreasures()
     if kind == "buy":
-        return Buy(_card_name(data))
+        overpay = data.get("overpay", 0)
+        if not isinstance(overpay, int) or isinstance(overpay, bool) or not 0 <= overpay <= MAX_OVERPAY:
+            raise ValueError("'overpay' must be a small whole number.")
+        return Buy(_card_name(data), overpay)
+    if kind == "buy_event":
+        return BuyEvent(_card_name(data))
+    if kind == "spend_coffers":
+        count = data.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= MAX_OVERPAY:
+            raise ValueError("'count' must be a small positive whole number.")
+        return SpendCoffers(count)
+    if kind == "spend_villager":
+        count = data.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= MAX_OVERPAY:
+            raise ValueError("'count' must be a small positive whole number.")
+        return SpendVillager(count)
+    if kind == "pay_debt":
+        count = data.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= MAX_OVERPAY:
+            raise ValueError("'count' must be a small positive whole number.")
+        return PayDebt(count)
     if kind == "end_phase":
         return EndPhase()
     if kind == "choose":
@@ -65,14 +91,4 @@ def action_from_dict(data: Any) -> Action:
         if not all(isinstance(c, str) and len(c) <= MAX_NAME_LENGTH for c in selection):
             raise ValueError("'selection' must contain card names.")
         return Choose(tuple(selection))
-    if kind == "spend_coffers":
-        count = data.get("count", 1)
-        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
-            raise ValueError("'count' must be a positive integer.")
-        return SpendCoffers(count)
-    if kind == "spend_villagers":
-        count = data.get("count", 1)
-        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
-            raise ValueError("'count' must be a positive integer.")
-        return SpendVillagers(count)
     raise ValueError("Unknown action type.")

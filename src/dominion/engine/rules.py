@@ -17,12 +17,12 @@ from typing import Optional
 
 from ..cards import CardType, get_card
 from .actions import (
-    Action, Buy, Cheat, Choose, Decision, EndGame, EndPhase, PlayAction, PlayAllTreasures, PlayTreasure, Resign,
-    SpendCoffers, SpendVillagers,
+    Action, Buy, BuyEvent, Cheat, Choose, Decision, EndGame, EndPhase, PayDebt, PlayAction, PlayAllTreasures, PlayTreasure,
+    Resign, SpendCoffers, SpendVillager,
 )
-from .cardtypes import is_treasure
+from .cardtypes import is_plain_treasure, is_treasure
 from .constants import CHEAT_KINDS
-from .costs import card_cost, is_walled
+from .costs import card_cost, is_buried, is_walled
 from .state import GameState, GameStatus, Phase
 
 
@@ -50,8 +50,9 @@ def is_game_over(state: GameState) -> bool:
         return True
     empty = sum(
         1 for name, count in state.supply.items()
-        if count == 0 and name not in state.catastrophes     # scarce piles never end the game
+        if count == 0 and name not in state.catastrophes and name not in state.stack_of     # scarce piles never end the game
     )
+    empty += sum(1 for stack in state.stacks.values() if not stack)         # Knights / Ruins count as one pile each
     return empty >= state.empty_pile_limit
 
 
@@ -95,31 +96,45 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
         return None
 
     if isinstance(action, SpendCoffers):
-        if state.phase is not Phase.BUY:
-            return "Coffers can only be spent during the Buy phase."
-        if not isinstance(action.count, int) or action.count < 1:
-            return "Spend at least 1 Coffers."
-        if action.count > me.coffers:
-            return f"You only have {me.coffers} Coffers."
+        if not 1 <= action.count <= me.coffers:
+            return f"You only have {me.coffers} Coffers token(s)."
         return None
 
-    if isinstance(action, SpendVillagers):
+    if isinstance(action, SpendVillager):
+        if state.no_more_actions:
+            return "Snowy Village: you ignore further +Actions this turn."
         if state.phase is not Phase.ACTION:
             return "Villagers can only be spent during the Action phase."
-        if not isinstance(action.count, int) or action.count < 1:
-            return "Spend at least 1 Villager."
-        if action.count > me.villagers:
+        if not 1 <= action.count <= me.villagers:
             return f"You only have {me.villagers} Villager(s)."
         return None
 
+    if isinstance(action, PayDebt):
+        if state.phase is not Phase.BUY:
+            return "You can only pay off Debt during the Buy phase."
+        if not 1 <= action.count <= me.debt:
+            return f"You only owe {me.debt} Debt token(s)."
+        if action.count > state.coins:
+            return f"You only have ${state.coins} to pay off Debt with."
+        return None
+
     if isinstance(action, PlayAction):
+        if state.phase is Phase.NIGHT:                          # Nocturne: only Night cards, and they cost no Action
+            if action.card not in me.hand:
+                return f"{action.card} is not in your hand."
+            if not get_card(action.card).is_type(CardType.NIGHT):
+                return f"{action.card} is not a Night card."
+            return None
         if state.phase is not Phase.ACTION:
             return "Actions can only be played during the Action phase."
         if state.actions < 1:
             return "You have no Actions left."
         if action.card not in me.hand:
             return f"{action.card} is not in your hand."
-        if not get_card(action.card).is_type(CardType.ACTION):
+        blocked = _play_blocked(state, me, action.card)
+        if blocked:
+            return blocked
+        if not _is_action(me, action.card):
             return f"{action.card} is not an Action card."
         return None
 
@@ -130,13 +145,37 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
             return f"{action.card} is not in your hand."
         if not is_treasure(state, action.card):
             return f"{action.card} is not a Treasure."
-        return None
+        return _play_blocked(state, me, action.card)
 
     if isinstance(action, PlayAllTreasures):
         if state.phase is not Phase.BUY:
             return "Treasures can only be played during the Buy phase."
         if not _treasures_in_hand(state, me.hand):
             return "You have no Treasures in hand."
+        return _play_blocked(state, me, None)
+
+    if isinstance(action, BuyEvent):
+        if state.phase is not Phase.BUY:
+            return "You can only buy Events during the Buy phase."
+        if action.card not in state.events:
+            return f"{action.card} is not an Event in this game."
+        event = get_card(action.card)
+        if me.debt > 0:
+            return f"You owe {me.debt} Debt token(s): pay it off before buying anything."
+        if state.buys < 1:
+            return "You have no Buys left."
+        if event.cost > state.coins:
+            return f"{action.card} costs ${event.cost} but you only have ${state.coins}."
+        if event.once_per_turn and state.turn_counts.get("event:" + action.card):
+            return f"{action.card} can only be bought once per turn."
+        if event.can_buy_fn is not None:
+            reason = event.can_buy_fn(state)
+            if reason:
+                return reason
+        if event.is_type(CardType.PROJECT) and action.card in me.projects:
+            return f"You already have a cube on {action.card}."
+        if event.is_type(CardType.PROJECT) and len(me.projects) >= 2:
+            return "You only have two cubes: no more Projects."
         return None
 
     if isinstance(action, Buy):
@@ -144,6 +183,8 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
             return "You can only buy during the Buy phase."
         if state.buy_locked:
             return "You may not buy cards this turn."
+        if me.debt > 0:
+            return f"You owe {me.debt} Debt token(s): pay it off before buying anything."
         if state.buys < 1:
             return "You have no Buys left."
         if action.card not in state.supply:
@@ -152,8 +193,14 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
             return f"The {action.card} pile is empty."
         if is_walled(state, action.card, player):
             return f"{state.players[state.walls[action.card]].name} has walled off the {action.card} pile."
+        if is_buried(state, action.card):
+            return f"{action.card} is not on top of its pile."
         cost = card_cost(state, action.card)
-        if cost > state.coins:
+        if action.overpay < 0 or (action.overpay and not get_card(action.card).overpay):
+            return f"{action.card} cannot be overpaid for."
+        if cost + action.overpay > state.coins and not _fair_by_trashing(action.card, me):
+            if action.overpay:
+                return f"{action.card} costs ${cost} plus an overpayment of ${action.overpay}, but you only have ${state.coins}."
             return f"{action.card} costs ${cost} but you only have ${state.coins}."
         potion_cost = get_card(action.card).potion_cost
         if potion_cost > state.potions:
@@ -177,35 +224,79 @@ def legal_actions(state: GameState, player: Optional[int] = None) -> list:
     me = state.players[state.current_player]
     result: list = []
 
+    if state.phase is Phase.NIGHT:                               # Nocturne: any number of Night cards, then Clean-up
+        for card in sorted(set(me.hand)):
+            if get_card(card).is_type(CardType.NIGHT):
+                result.append(PlayAction(card))
+        result.append(EndPhase())
+        return result
+
     if state.phase is Phase.ACTION:
         if state.actions >= 1:
             for card in sorted(set(me.hand)):
-                if get_card(card).is_type(CardType.ACTION):
+                if _is_action(me, card) and _play_blocked(state, me, card) is None:
                     result.append(PlayAction(card))
-        if me.villagers >= 1:
-            result.append(SpendVillagers(1))
+        if me.villagers > 0 and not state.no_more_actions:      # Renaissance: Villagers give Actions in the Action phase
+            result.append(SpendVillager(1))
+            if me.villagers > 1:
+                result.append(SpendVillager(me.villagers))
         result.append(EndPhase())
         return result
 
     # Buy phase
-    treasures = sorted(set(_treasures_in_hand(state, me.hand)))
+    treasures = sorted(set(_treasures_in_hand(state, me.hand))) if _play_blocked(state, me, None) is None else []
     for card in treasures:
         result.append(PlayTreasure(card))
-    if treasures:
+    if any(is_plain_treasure(state, c) for c in treasures):
         result.append(PlayAllTreasures())
-    if me.coffers >= 1:
+    if me.coffers > 0:
         result.append(SpendCoffers(1))
         if me.coffers > 1:
             result.append(SpendCoffers(me.coffers))
-    if state.buys >= 1 and not state.buy_locked:
+    if me.debt > 0 and state.coins > 0:                          # Empires: Debt is paid off with $, one token per $
+        result.append(PayDebt(1))
+        if min(me.debt, state.coins) > 1:
+            result.append(PayDebt(min(me.debt, state.coins)))
+    if state.buys >= 1 and me.debt == 0:
+        for name in state.events:                               # Adventures: Events are bought with a Buy, even when cards cannot be bought
+            if validate(state, actor, BuyEvent(name)) is None:
+                result.append(BuyEvent(name))
+    if state.buys >= 1 and not state.buy_locked and me.debt == 0:
         for name in sorted(state.supply):
-            if state.supply[name] > 0 and card_cost(state, name) <= state.coins and not is_walled(state, name, actor) and state.potions >= get_card(name).potion_cost and _buy_restriction(state, name) is None:
+            if state.supply[name] > 0 and (card_cost(state, name) <= state.coins or _fair_by_trashing(name, me)) and not is_walled(state, name, actor) and not is_buried(state, name) and state.potions >= get_card(name).potion_cost and _buy_restriction(state, name) is None:
                 result.append(Buy(name))
+                if get_card(name).overpay:                       # Guilds: paying extra on purpose
+                    spare = state.coins - card_cost(state, name)
+                    result.extend(Buy(name, extra) for extra in range(1, min(spare, MAX_OVERPAY_OPTIONS) + 1))
     result.append(EndPhase())
     return result
 
 
+MAX_OVERPAY_OPTIONS = 12      # at most this many different overpayments are offered per card in the list of legal actions
+
+
 # ------------------------------------------------------------------ helpers
+def _is_action(me, card: str) -> bool:
+    """An Action card, or an Estate that Inheritance has turned into an Action for this player."""
+    return get_card(card).is_type(CardType.ACTION) or (card == "Estate" and me.inherited is not None)
+
+
+def _play_blocked(state: GameState, me, card) -> Optional[str]:
+    """Allies: why this card cannot be played from the hand right now. Voyage turns allow only 3 cards from the hand; a player under a
+    Warlord cannot play an Action they already have 2 or more copies of in play."""
+    if state.voyage_turn and state.hand_plays >= 3:
+        return "Voyage: you can only play 3 cards from your hand this turn."
+    if card is not None and state.warlords and any(t == state.current_player for _, t in state.warlords) \
+            and get_card(card).is_type(CardType.ACTION) and me.in_play.count(card) >= 2:
+        return f"Warlord: you cannot play {card}, you already have 2 or more copies of it in play."
+    return None
+
+
+def _fair_by_trashing(name: str, me) -> bool:
+    """Menagerie, Animal Fair: it can be bought without paying its cost by trashing an Action card from the hand."""
+    return name == "Animal Fair" and any(get_card(c).is_type(CardType.ACTION) for c in me.hand)
+
+
 def _treasures_in_hand(state: GameState, hand: list) -> list:
     return [c for c in hand if is_treasure(state, c)]
 
@@ -214,6 +305,8 @@ def _buy_restriction(state: GameState, name: str) -> Optional[str]:
     """Why ``name`` cannot be bought right now even though it is affordable (Contraband, Grand Market), or None."""
     if name in state.banned:
         return f"{name} was named by Contraband: it cannot be bought this turn."
+    if state.deluded_turn and get_card(name).is_type(CardType.ACTION):
+        return f"You are Deluded: you cannot buy Action cards this turn."
     check = get_card(name).can_buy_fn
     return check(state) if check is not None else None
 

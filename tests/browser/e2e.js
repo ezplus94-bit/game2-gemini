@@ -89,7 +89,7 @@ function step(w) {
 
   // card sets: both ticked by default, the guest cannot change them, the last one cannot be unticked
   const setBoxes = (w) => [...$(w, "expansion-row").querySelectorAll("input")];
-  assert(setBoxes(A).length === 4 && setBoxes(A).every((i) => i.checked), "Base, Alchemy, Intrigue and Seaside are all ticked by default");
+  assert(setBoxes(A).length === 6 && setBoxes(A).every((i) => i.checked), "all six card sets are ticked by default");
   assert(setBoxes(B).every((i) => i.disabled), "guest cannot change the card sets");
   setBoxes(A)[0].checked = false; setBoxes(A)[0].dispatchEvent(new A.Event("change", { bubbles: true }));
   await until(() => setBoxes(B)[0].checked === false && setBoxes(B)[1].checked === true, "guest sees Base unticked");
@@ -98,12 +98,16 @@ function step(w) {
   setBoxes(A)[2].checked = false; setBoxes(A)[2].dispatchEvent(new A.Event("change", { bubbles: true }));
   await until(() => setBoxes(B)[2].checked === false && setBoxes(B)[3].checked === true, "guest sees Intrigue unticked");
   setBoxes(A)[3].checked = false; setBoxes(A)[3].dispatchEvent(new A.Event("change", { bubbles: true }));
+  await until(() => setBoxes(B)[3].checked === false && setBoxes(B)[4].checked === true, "guest sees Prosperity unticked");
+  setBoxes(A)[4].checked = false; setBoxes(A)[4].dispatchEvent(new A.Event("change", { bubbles: true }));
+  await until(() => setBoxes(B)[4].checked === false && setBoxes(B)[5].checked === true, "guest sees the fifth set unticked");
+  setBoxes(A)[5].checked = false; setBoxes(A)[5].dispatchEvent(new A.Event("change", { bubbles: true }));
   await until(() => /at least one card set/.test($(A, "toast").textContent), "cannot untick every card set");
-  await until(() => setBoxes(A)[3].checked === true, "page re-syncs the rejected tick");
+  await until(() => setBoxes(A)[5].checked === true, "page re-syncs the rejected tick");
   setBoxes(A)[0].checked = true; setBoxes(A)[0].dispatchEvent(new A.Event("change", { bubbles: true }));
   await until(() => setBoxes(B)[0].checked === true, "Base ticked again");
   assert($(A, "kingdom-grid").textContent.includes("Torturer") && $(A, "kingdom-grid").textContent.includes("Cellar"), "kingdom picker lists both sets");
-  assert([...$(A, "kingdom-grid").querySelectorAll(".exp-title")].map((e) => e.textContent).join() === "Base,Alchemy,Intrigue,Seaside", "picker grouped by set");
+  assert([...$(A, "kingdom-grid").querySelectorAll(".exp-title")].map((e) => e.textContent).join() === "Base,Alchemy,Cornucopia & Guilds,Hinterlands,Intrigue,Prosperity,Seaside", "picker grouped by set");
   assert($(A, "btn-leave") && !$(A, "btn-leave").hidden, "Leave button is in the header, in the lobby too");
 
   // host adds a bot and picks a custom kingdom

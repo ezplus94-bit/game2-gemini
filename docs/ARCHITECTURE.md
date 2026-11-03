@@ -347,6 +347,38 @@ request from the players. It leaks an aggregate, not card identities.
 * Update 10 removed the discard-pile and all-my-cards viewers again, following the rulebook (see below).
 * Ideas not built yet: turn timers, and bots that play Action cards.
 
+### Adventures hooks (update 18)
+* **Reserve cards**: `PlayerState.tavern` is the Tavern mat. `CardDef.call_when` ("start", "after_action", "gain", "buy_end"), `call_cond`
+  and `call_fn` describe when a Reserve card may be called; `effects.call_steps` asks the player at each moment (start of turn and
+  end of Buy phase in `Game._begin_turn_steps` / `_end_buy_steps`, after an Action in `_play_steps` and `EffectContext.resolve`, on a gain in `_gain_steps`).
+* **Travellers**: `CardDef.exchange` plus an `on_cleanup` that calls `EffectContext.exchange_in_play`; upgrade piles live in `GameState.offsupply`.
+* **Tokens**: `PlayerState.journey_up / minus_card / minus_coin / tokens` (`zones.draw_cards` and `effects.take_minus_coin` use the first two;
+  `effects.apply_play_bonuses` handles pile tokens and Champion; `costs.card_cost` the -$2 Cost token; `_gain_steps` the Trashing token).
+* **Events**: `CardType.EVENT` cards with an `on_play` effect, listed in `GameState.events` (`GameConfig.events`), bought with the new
+  `BuyEvent` action (`Game._buy_event`); `once_per_turn` events are tracked in `turn_counts`. Mission uses `mission_flag / mission_next / mission_turn`
+  (an extra turn like Outpost's, with `buy_locked`). Inheritance sets `PlayerState.inherited`: Estates then count as Actions (`rules._is_action`).
+* `CardDef.on_buy_by_other` is for Durations that react to another player's purchase (Haunted Woods, Swamp Hag).
+
+### Nocturne hooks (update 20)
+* **Night phase**: `Phase.NIGHT`, entered from `Game._end_buy_steps` only when a Night card (`CardType.NIGHT`) is in hand. Night cards use the ordinary `PlayAction`;
+  `rules.validate` / `legal_actions` allow only Night cards in that phase and `Game._play_action` charges no Action. `ctx.in_night_phase` is for Werewolf.
+* **Boons / Hexes / States**: decks and discard piles in `GameState` (`boons`, `boons_discard`, `hexes`, ..., `kept_boons`, `druid_boons`, `river_draws`, `lost_in_woods`);
+  per player `held_boons`, `deluded`, `envious`, `miserable`. Their texts and effects are plain functions in `cards/nocturne.py` (`BOONS`, `BOON_FUNCS`, `HEXES`, `HEX_FUNCS`,
+  `STATES`); `EffectContext.receive_boon / receive_hex / draw_boon / discard_boon` run them for any receiving player. `engine/nocturne.py` has setup, the start-of-turn
+  steps (held Boons, Lost in the Woods), Deluded / Envious at the start of the Buy phase and the end-of-turn draws (River's Gift, Faithful Hounds, kept Boons).
+* **Cards**: `CardDef.heirloom` (setup swaps a Copper), `CardDef.gains_to_hand` (`zones.gain_card`), `PlayerState.crypt / ghosted / hounds` zones (counted by `all_cards`),
+  Changeling's exchange in `Game._gain_steps` (`ctx.can_return_gained / exchange_gained_for`), `ctx.exchange_in_play_for` (Vampire, Bat), `ctx.play_from_trash` (Necromancer,
+  `turn_counts["necro:<card>"]` marks face-down copies), `zones.tunnel_discarded` also sets Faithful Hounds aside, Guardian is a Lighthouse-style protection in `is_protected`.
+
+### Renaissance hooks (update 21)
+* **Villagers**: `PlayerState.villagers` and the `SpendVillager` action (rules, codec, `Game._spend_villager`, a button in the page). Coffers are the Guilds ones.
+* **Projects** are `CardDef`s of type PROJECT kept in `GameState.events`, bought with `BuyEvent` (its `on_play` is `ctx.take_project()`); owned Projects are `PlayerState.projects`.
+  `engine/renaissance.py` has the start-of-turn, end-of-Buy-phase, gain, trash, Clean-up (Improve, Horn) and Star Chart steps; `Game` calls them. Canal is in `costs.card_cost`,
+  Capitalism in `cardtypes.has_type` (`is_plain_treasure` is what "play all Treasures" uses), Citadel in `effects.citadel_check` (used by `Game._play_steps`, `ctx.resolve`,
+  `ctx.resolve_treasure`), Star Chart in `zones.take_top_cards` (a draw that shuffles queues `GameState.star_draws`), Priest in `TrashEvent.priest`, Fleet in `Game._game_ends`.
+* **Artifacts**: names in `cards/renaissance.py::ARTIFACTS`; `GameState.artifacts` maps each one in the game to its holder. Patron's reveals are found by `scan_reveals` in the log.
+* **Cards**: new zones `cargo_aside` and `research_aside` (counted by `all_cards`); Cargo Ship's `DurationEntry.data` records the card set aside on it.
+
 ## 10. Known limitations
 
 * All 26 base-set Kingdom cards are implemented. Only one kind of Reaction exists (blocks an Attack, like Moat). Reactions with other triggers or effects (Diplomat, Watchtower, Horse Traders) and Duration cards are not implemented yet.
@@ -357,3 +389,23 @@ request from the players. It leaks an aggregate, not card identities.
   mode or persistence yet.
 * Disconnected players stall the game (it waits for them to rejoin). There is no
   turn timer or forfeit yet.
+
+### Menagerie hooks (update 22)
+* `engine/menagerie.py` holds the engine side: `gain_reaction_steps` (Sheepdog, Sleigh, Falconer, Black Cat; asked in turn order from the current player, restarting after each Reaction played),
+  `after_gain_steps` (Gatekeeper, copies on the Exile mat, Invest, Way of the Monkey, Livery, Way of the Seal), `discard_steps` (Village Green via `GameState.discard_events`, filled by
+  `zones.tunnel_discarded`), `start_of_turn` and `pick_mouse_card` (Way of the Mouse's set-aside Action; it is added to `used` so its setup happens).
+* Ways: `CardType.WAY`, `GameState.ways`; `effects.play_effect` is the one place an Action's effect runs (Kiln, then `way_choice`, then the Way or the card, Enchantress skipping only the card).
+  Way of the Chameleon sets `EffectContext._chameleon` so `draw` and `add_coins` swap. Cards played with a Way never add Duration entries, so they are simply discarded.
+* Exile: `PlayerState.exile` (+ `invested`), `zones.exile_from_supply`, `EffectContext.exile_*`. Delay, Reap and Way of the Turtle use `PlayerState.delayed` and
+  `EffectContext.add_delayed_play` (a `DurationEntry` with no cards, so it never keeps a card in play).
+* `EffectContext.add_actions/add_buys/add_coins` do nothing off turn (Reactions played on another player's turn); Clean-up discards other players' leftover in-play cards.
+* Events with a condition use `CardDef.can_buy_fn` (now also checked by `rules.validate`); Seize the Day reuses the Outpost/Mission extra-turn machinery (`seize_flag/next/turn`).
+
+### Allies hooks (update 23)
+* `engine/allies.py`: one function per time an Ally can trigger (`start_of_turn_steps`, `start_of_buy_steps` via `Game._start_buy_steps`, `after_gain_steps`, `end_of_turn_steps` and `coastal_haven_steps` in Clean-up,
+  `shuffle_steps` for the two Orders) plus the standing effects of Kingdom cards (Guildmaster, Galleria, Bauble, Garrison, Skirmisher; Highwayman and Warlord pairs in `GameState.highwaymen/warlords`).
+  "After playing" Allies are `effects.ally_after_play` (called after every Action or Treasure resolves). `GameConfig.ally` / `GameState.ally` / `PlayerState.favors` hold the state.
+* Split piles reuse the Castles model: a placeholder Kingdom card (`Townsfolk`...) plus `GameState.stacks[pile]` (16 names, top first) and `stack_of`; `setup.ALLIES_SPLITS` builds them; `EffectContext.rotate_pile`.
+  `empty_piles()` now counts a split/mixed pile once (never its single cards).
+* `EffectContext.choose_modes` is the "choose one" helper that Elder extends (`GameState.elder_cards`). Extra turns: `queue_own_extra_turn` shares `seize_flag/next/turn` with Seize the Day; `voyage_*` and
+  `hand_plays` implement Voyage's 3-card limit in `rules._play_blocked`. `zones.take_top_cards` stops before a shuffle for the Orders (`star_draws` entry marked `"ally"`).

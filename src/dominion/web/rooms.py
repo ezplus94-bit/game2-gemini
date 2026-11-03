@@ -31,7 +31,7 @@ from ..cards import expansions as all_expansions, kingdom_cards
 from ..cards.registry import fenced_cards
 from ..engine import (
     Buy, Cheat, Choose, EndGame, EndPhase, Resign, GameConfig, GameStatus, IllegalActionError, PlayAction,
-    PlayAllTreasures, PlayTreasure, SpendCoffers, SpendVillagers, action_from_dict, build_view, new_game, replay,
+    PlayAllTreasures, PlayTreasure, action_from_dict, build_view, new_game, replay,
 )
 from ..engine.constants import CHEAT_PHRASES, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS
 from ..engine.views import card_info
@@ -103,6 +103,9 @@ class Room:
         self.expansions: list = all_expansions()   # card sets a random Kingdom is drawn from
         self.catastrophes: list = []            # optional Catastrophe / Special cards (host chooses, max 2)
         self.cheats = False                     # cheat codes typed in the chat (host's choice, default off)
+        self.colonies = None                    # Platinum and Colony: None = automatic, True = always, False = never
+        self.events = None                      # Adventures Events: None = automatic (two when an Adventures card is in the Kingdom), False = none
+        self.shelters = None                    # Dark Ages Shelters instead of 3 Estates: None = automatic, True = always, False = never
         self.game = None
         self.lock = asyncio.Lock()
         self.bot_task: Optional[asyncio.Task] = None
@@ -150,6 +153,9 @@ class RoomManager:
             "set_expansions": self._set_expansions,
             "set_catastrophes": self._set_catastrophes,
             "set_cheats": self._set_cheats,
+            "set_colonies": self._set_colonies,
+            "set_shelters": self._set_shelters,
+            "set_events": self._set_events,
             "list_games": self._list_games,
             "resign": self._resign,
             "end_game": self._end_game,
@@ -324,6 +330,36 @@ class RoomManager:
             room.cheats = value
             await self._broadcast(room)
 
+    async def _set_colonies(self, conn, msg) -> None:
+        room, seat = _require_host(conn)
+        async with room.lock:
+            _require_lobby(room)
+            value = msg.get("colonies")
+            if value is not None and not isinstance(value, bool):
+                raise UserError("Platinum and Colony: choose automatic, always or never.")
+            room.colonies = value                     # None = automatic (a Prosperity card picked at random)
+            await self._broadcast(room)
+
+    async def _set_shelters(self, conn, msg) -> None:
+        room, seat = _require_host(conn)
+        async with room.lock:
+            _require_lobby(room)
+            value = msg.get("shelters")
+            if value is not None and not isinstance(value, bool):
+                raise UserError("Shelters: choose automatic, always or never.")
+            room.shelters = value                     # None = automatic (a Dark Ages card picked at random)
+            await self._broadcast(room)
+
+    async def _set_events(self, conn, msg) -> None:
+        room, seat = _require_host(conn)
+        async with room.lock:
+            _require_lobby(room)
+            value = msg.get("events")
+            if value is not None and value is not False:
+                raise UserError("Events: choose automatic or none.")
+            room.events = value
+            await self._broadcast(room)
+
     async def _add_bot(self, conn, msg) -> None:
         room, seat = _require_host(conn)
         async with room.lock:
@@ -362,7 +398,8 @@ class RoomManager:
             try:
                 room.game = new_game(GameConfig(
                     [s.name for s in room.seats], room.kingdom, None, random_start=self.random_start,
-                    catastrophes=room.catastrophes, expansions=room.expansions, cheats=room.cheats,
+                    catastrophes=room.catastrophes, expansions=room.expansions, cheats=room.cheats, colonies=room.colonies,
+                    shelters=room.shelters, events=[] if room.events is False else None,
                 ))
             except ValueError as err:
                 raise UserError(str(err)) from None
@@ -661,6 +698,9 @@ class RoomManager:
                 "catastrophes": room.catastrophes,
                 "available_catastrophes": [card_info(n) for n in fenced_cards()],
                 "cheats": room.cheats,
+                "colonies": room.colonies,
+                "shelters": room.shelters,
+                "events": room.events,
                 "min_players": MIN_PLAYERS,
                 "max_players": MAX_PLAYERS,
                 "kingdom_size": KINGDOM_SIZE,
@@ -755,10 +795,6 @@ def _describe_action(action) -> str:
         return "play all Treasures"
     if isinstance(action, Buy):
         return f"buy {action.card}"
-    if isinstance(action, SpendCoffers):
-        return f"spend {action.count} Coffers"
-    if isinstance(action, SpendVillagers):
-        return f"spend {action.count} Villager(s)"
     if isinstance(action, EndPhase):
         return "end a phase"
     if isinstance(action, Choose):
