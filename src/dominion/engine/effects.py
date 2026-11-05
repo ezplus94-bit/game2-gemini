@@ -176,6 +176,7 @@ class EffectContext:
             return
         if n > 0:
             n = take_minus_coin(self._state, n)
+            self._state.coin_ticks += 1
         self._state.coins += n
 
     # ---- card movement
@@ -361,6 +362,7 @@ class EffectContext:
     # ---- playing cards from inside other cards (Throne Room, Vassal, Golem)
     def put_in_play(self, card: str, zone: str = "hand") -> None:
         zones.move_card(self._state, self.player, card, zone, "in_play")
+        self._state.turn_counts["any_play"] = 1               # Plunder: this is not a Treasure played first any more (Landing Party)
         if zone == "hand":
             self._state.hand_plays += 1                       # Voyage counts cards played from the hand
         self.log(f"{self._name()} plays {card} with {self.source}.")
@@ -372,11 +374,14 @@ class EffectContext:
         self._state.played_log.append(card)
         again = citadel_check(self._state, self.player, card)       # Renaissance: Citadel
         before = len(self._me().durations)
+        from . import plunder
+        snap = plunder.before_play(self._state)
         yield from urchin_steps(self._state, self.player, card)
         apply_play_bonuses(self._state, self.player, card)
         yield from play_effect(self._state, self.player, card, get_card(card).on_play)
         yield from call_steps(self._state, self.player, "after_action", card)
         yield from ally_after_play(self._state, self.player, card)  # Allies: Circle of Witches, League of Shopkeepers, Fellowship of Scribes
+        yield from plunder.after_play_steps(self._state, self.player, card, snap)     # Plunder: Harbor Village, Frigate, Flagship, Inspiring
         if again:
             self.log(f"{self._name()}'s Citadel plays {card} again.", "play", 1)
             yield from EffectContext(self._state, self.player, "Citadel").resolve(card)
@@ -438,6 +443,9 @@ class EffectContext:
         s = self._state
         definition = get_card(card)
         again = False
+        from . import plunder
+        snap = plunder.before_play(s)
+        reckless = bool(s.traits) and plunder.trait_of(s, card) == "Reckless"      # Plunder: followed twice
         yield from kiln_steps(s, self.player, card)                 # Menagerie: Kiln gains a copy first
         if definition.is_type(CardType.ACTION):                    # Renaissance: Capitalism made this Action a Treasure too
             s.played_log.append(card)
@@ -456,6 +464,8 @@ class EffectContext:
             value = 1                                         # Nocturne: Envious
         if s.midas and value < 3:
             value, potions, note = 3, 0, " as Gold"          # Midas Touch: everything turns to gold
+        if reckless and not blanked:
+            value, potions, note = value * 2, potions * 2, note + " (Reckless: twice)"
         s.turn_counts[card] = s.turn_counts.get(card, 0) + 1     # (Fool's Gold asks how often it was played before)
         if value > 0:
             value = take_minus_coin(s, value)                     # Adventures: the -$1 token
@@ -466,13 +476,15 @@ class EffectContext:
                  else f"{self._name()} plays {card}{note} (+${value}).", "treasure", 0)
         fire_triggers(s, "treasure_played", self.player, card)
         if definition.on_play is not None and not blanked:
-            result = definition.on_play(EffectContext(s, self.player, card))
-            if inspect.isgenerator(result):
-                yield from result
+            for _ in range(2 if reckless else 1):
+                result = definition.on_play(EffectContext(s, self.player, card))
+                if inspect.isgenerator(result):
+                    yield from result
         if again:
             self.log(f"{self._name()}'s Citadel plays {card} again.", "play", 1)
             yield from EffectContext(s, self.player, "Citadel").resolve(card)
         yield from ally_after_play(s, self.player, card)             # Allies: Circle of Witches, League of Shopkeepers
+        yield from plunder.after_play_steps(s, self.player, card, snap)       # Plunder: Inspiring
 
     def play_treasure(self, card: str, zone: str = "hand"):
         """Generator: play a Treasure from ``zone`` ("in_play" to play a Treasure that is already in play again)."""
@@ -1788,6 +1800,96 @@ class EffectContext:
         for card in reversed(order):
             self.put_set_aside_on_deck(card)
 
+    # ---- Plunder: Loot, set-aside cards, Durations that wait for something
+    def gain_loot(self, destination: str = "discard", player: Optional[int] = None) -> Optional[str]:
+        """Gain the top card of the Loot pile (revealed). Returns its name, or None when the pile is empty."""
+        s = self._state
+        i = self.player if player is None else player
+        if not s.loot:
+            return None
+        name = s.loot[0]
+        if not zones.gain_offsupply(s, i, name, destination):
+            return None
+        taker = zones.beneficiary(s, i)
+        where = "" if destination == "discard" or taker != i else f" to their {destination}"
+        self.log(f"{self._name(taker)} gains a Loot: {name}{where}." + (" (Possession)" if taker != i else ""), "gain")
+        return name
+
+    def aside(self, card: str, source: str = "hand") -> None:
+        """Set a card aside (Cage, Grotto, Quartermaster, Prepare...). It is still its owner's."""
+        zones.move_card(self._state, self.player, card, source, "plunder_aside")
+
+    def aside_to(self, card: str, destination: str, player: Optional[int] = None) -> None:
+        zones.move_card(self._state, self.player if player is None else player, card, "plunder_aside", destination)
+
+    def aside_cards(self) -> tuple:
+        return tuple(self._me().plunder_aside)
+
+    def eot_hand(self, card: str, source: str = "hand", player: Optional[int] = None) -> None:
+        """Set a card aside; it goes into its owner's hand at the end of this turn (after the next hand was drawn)."""
+        zones.move_card(self._state, self.player if player is None else player, card, source, "eot_hand")
+
+    def gain_aside(self, card: str) -> bool:
+        """Gain a card and set it aside at once (Quartermaster). Returns True only if the card really ended up set aside."""
+        s = self._state
+        if not self.gain(card):
+            return False
+        me = self._me()
+        for event in reversed(s.gain_events):
+            if event.card == card and event.player == self.player and event.zone is not None:
+                zone = getattr(me, event.zone)
+                if card in zone:
+                    zone.pop(len(zone) - 1 - zone[::-1].index(card))
+                    me.plunder_aside.append(card)
+                    event.zone = None
+                    return True
+                break
+        return False
+
+    def add_wait(self, kind: str, data: Optional[dict] = None, cards: Optional[Sequence[str]] = None, handler=None) -> None:
+        """A Duration that stays in play until something happens (``kind``); the card's ``wait`` hook then runs. It keeps waiting
+        through its owner's start of turn (``persist``)."""
+        entry_data = {"wait": kind, "persist": True, **(data or {})}
+        self._me().durations.append(DurationEntry(self.source, tuple(cards) if cards is not None else (self.source,), handler, entry_data))
+
+    def end_wait(self, entry) -> None:
+        """The waiting is over: the card goes to the discard pile in the Clean-up of that turn (unless something else keeps it)."""
+        durations = self._me().durations
+        if entry in durations:
+            durations.remove(entry)
+
+    def all_in_play(self) -> tuple:
+        return tuple(c for p in self._state.players for c in p.in_play)
+
+    def loot_left(self) -> int:
+        return len(self._state.loot)
+
+    def trait_of(self, card: str) -> Optional[str]:
+        s = self._state
+        return s.traits.get(s.stack_of.get(card, card)) if s.traits else None
+
+    def pile_empty_after(self, card: str) -> bool:
+        s = self._state
+        pile = s.stack_of.get(card)
+        return (not s.stacks.get(pile)) if pile is not None else s.supply.get(card, 1) == 0
+
+    def set_count(self, key: str, value: int) -> None:
+        self._state.turn_counts[key] = value
+
+    def previous_turn_was_mine(self) -> bool:
+        return self._state.prev_turn == self.player
+
+    def queue_journey_turn(self) -> None:
+        s = self._state
+        s.seize_flag = True
+        s.turn_counts["journey_keep"] = 1
+        self.log(f"{self._name()} takes an extra turn after this one, and leaves their cards in play.", "skip")
+
+    def deck_to_bottom(self, card: str, source: str = "discard") -> None:
+        me = self._me()
+        getattr(me, source).remove(card)
+        me.deck.insert(0, card)
+
     # ---- end-of-turn triggers
     def add_trigger(self, event: str, handler: Callable) -> None:
         self._state.triggers.append(Trigger(event, self.source, handler, self.player))
@@ -1889,6 +1991,11 @@ def play_effect(state: GameState, player: int, card: str, on_play):
     result = on_play(ctx)
     if inspect.isgenerator(result):
         yield from result
+    if way is None and state.traits and state.traits.get(state.stack_of.get(card, card)) == "Reckless":      # Plunder: Reckless Actions are followed twice
+        ctx.log(f"Reckless: {card} is followed a second time.")
+        result = on_play(EffectContext(state, player, card))
+        if inspect.isgenerator(result):
+            yield from result
 
 
 def urchin_steps(state: GameState, player: int, card: str):

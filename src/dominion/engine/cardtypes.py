@@ -25,7 +25,7 @@ def is_treasure(state, name: str) -> bool:
 
 def is_plain_treasure(state, name: str) -> bool:
     """A Treasure by its own type (what "play all Treasures" plays), not one that Capitalism turned an Action into."""
-    return has_type(state, name, CardType.TREASURE, capitalism=False)
+    return has_type(state, name, CardType.TREASURE, capitalism=False) and not get_card(name).is_type(CardType.ACTION)     # (Spell Scroll is played by hand)
 
 
 def treasure_coins(state, name: str) -> int:

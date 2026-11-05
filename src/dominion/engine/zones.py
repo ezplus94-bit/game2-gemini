@@ -10,7 +10,7 @@ from .costs import is_buried, is_walled
 from .state import GainEvent, GameState, TrashEvent
 
 # Zones a card can be moved between. "trash" is shared; the rest are per player.
-PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "island_mat", "village_mat", "haven", "farmhands", "joust_aside", "tavern", "saved", "archived", "crypt", "ghosted", "hounds", "cargo_aside", "research_aside", "exile", "delayed")
+PLAYER_ZONES = ("hand", "deck", "discard", "in_play", "set_aside", "island_mat", "village_mat", "haven", "farmhands", "joust_aside", "tavern", "saved", "archived", "crypt", "ghosted", "hounds", "cargo_aside", "research_aside", "exile", "delayed", "plunder_aside", "eot_hand", "eot_deck")
 
 
 def beneficiary(state: GameState, player_index: int) -> int:
@@ -54,6 +54,11 @@ def take_top_cards(state: GameState, player_index: int, count: int, star: bool =
             if not player.discard:
                 break
             state.shuffles += 1
+            if star:
+                from . import plunder
+                if plunder.wants_shuffle_pause(state, player_index):          # Plunder: Fated and Avoid act before the shuffle is made
+                    state.star_draws.append([player_index, count - len(taken), "plunder"])
+                    break
             if star and state.ally in ("Order of Astrologers", "Order of Masons") and player.favors > 0:      # Allies: stop BEFORE the shuffle
                 state.star_draws.append([player_index, count - len(taken), "ally"])
                 break
@@ -157,6 +162,8 @@ def gain_offsupply(state: GameState, player_index: int, card: str, destination: 
     if destination not in ("discard", "hand", "deck"):
         raise ValueError(f"Unknown destination: {destination}")
     state.offsupply[card] -= 1
+    if card in state.loot:                           # Plunder: Loot leaves the shuffled pile
+        state.loot.remove(card)
     note_gain(state, card)
     player = state.players[player_index]
     getattr(player, destination).append(card)

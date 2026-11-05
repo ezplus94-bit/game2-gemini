@@ -76,7 +76,7 @@ def supporting_cards(expansion: str) -> list[str]:
                   if card.expansion == expansion and not card.kingdom and card.companion_of is None and CardType.EVENT not in card.types
                   and CardType.CATASTROPHE not in card.types and CardType.SPECIAL not in card.types
                   and CardType.PRIZE not in card.types and CardType.REWARD not in card.types and CardType.LANDMARK not in card.types
-                  and CardType.WAY not in card.types and CardType.ALLY not in card.types)
+                  and CardType.WAY not in card.types and CardType.ALLY not in card.types and CardType.TRAIT not in card.types)
 
 
 def event_cards(expansions=None) -> list[str]:
@@ -107,6 +107,12 @@ def way_cards(expansions=None) -> list[str]:
 def ally_cards() -> list[str]:
     """Names of every Ally (Allies): the landscape cards that say what Favor tokens can be spent on."""
     return sorted(name for name, card in _CARDS.items() if CardType.ALLY in card.types)
+
+
+def trait_cards(expansions=None) -> list[str]:
+    """Names of every Trait (Plunder): a landscape card that modifies one Action or Treasure pile for the whole game."""
+    return sorted(name for name, card in _CARDS.items()
+                  if CardType.TRAIT in card.types and (expansions is None or card.expansion in expansions))
 
 
 def expansions() -> list[str]:

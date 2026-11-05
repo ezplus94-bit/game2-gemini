@@ -224,7 +224,10 @@ def star_chart_steps(state: GameState):
         entry = state.star_draws.pop(0)
         player, remaining = entry[0], entry[1]
         me = state.players[player]
-        if len(entry) > 2:                                      # Allies: Order of Astrologers / Masons act before the shuffle is made
+        if len(entry) > 2 and entry[2] == "plunder":            # Plunder: Fated and Avoid act before the shuffle is made
+            from . import plunder
+            yield from plunder.shuffle_steps(state, player)
+        elif len(entry) > 2:                                    # Allies: Order of Astrologers / Masons act before the shuffle is made
             from . import allies
             yield from allies.shuffle_steps(state, player)
         if me.deck and "Star Chart" in me.projects:

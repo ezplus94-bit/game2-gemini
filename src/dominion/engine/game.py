@@ -17,7 +17,7 @@ import inspect
 from typing import Optional
 
 from ..cards import CardType, get_card
-from . import allies, landmarks, menagerie, nocturne, renaissance, zones
+from . import allies, landmarks, menagerie, nocturne, plunder, renaissance, zones
 from .cardtypes import is_plain_treasure, is_treasure, treasure_coins
 from .actions import (
     Action, Buy, BuyEvent, Cheat, Choose, EndGame, EndPhase, PayDebt, PlayAction, PlayAllTreasures, PlayTreasure, Resign, SpendCoffers, SpendVillager,
@@ -123,6 +123,7 @@ class Game:
         me = s.players[player]
         me.hand.remove(card)
         me.in_play.append(card)
+        s.turn_counts["any_play"] = 1                            # Plunder: a Treasure is no longer the first card played (Landing Party)
         night = s.phase is Phase.NIGHT                           # Nocturne: Night cards cost no Action; only Actions (Werewolf) count as plays
         if not night:
             s.actions -= 1
@@ -137,6 +138,7 @@ class Game:
         s = self.state
         s.played_log.append(card)
         again = citadel_check(s, player, card)                    # Renaissance: Citadel plays the first Action of the turn again
+        snap = plunder.before_play(s)
         yield from urchin_steps(s, player, card)
         apply_play_bonuses(s, player, card)
         on_play = get_card(card).on_play
@@ -145,6 +147,7 @@ class Game:
         yield from play_effect(s, player, card, on_play)           # Kiln, then a Way (Menagerie) or the card's effect (Enchantress may replace it)
         yield from call_steps(s, player, "after_action", card)    # Adventures: Royal Carriage, Coin of the Realm
         yield from ally_after_play(s, player, card)                # Allies: Circle of Witches, League of Shopkeepers, Fellowship of Scribes
+        yield from plunder.after_play_steps(s, player, card, snap)  # Plunder: Harbor Village, Frigate, Flagship, Inspiring
         if again:
             s.log.append(f"{s.players[player].name}'s Citadel plays {card} again.", "play", 1)
             yield from EffectContext(s, player, "Citadel").resolve(card)
@@ -155,7 +158,15 @@ class Game:
         me.hand.remove(card)
         me.in_play.append(card)
         s.hand_plays += 1
-        self._advance(EffectContext(s, player, card).resolve_treasure(card), None, card)     # its $ and its own effect
+        first = not s.turn_counts.get("any_play")                # Plunder: Landing Party cares about the first card played on a turn
+        s.turn_counts["any_play"] = 1
+        self._advance(self._treasure_steps(player, card, first), None, card)
+
+    def _treasure_steps(self, player: int, card: str, first: bool):
+        s = self.state
+        yield from EffectContext(s, player, card).resolve_treasure(card)     # its $ and its own effect
+        if first and s.current_player == player:
+            yield from plunder.treasure_played_first(s, player, card)
 
     def _spend_coffers(self, player: int, count: int) -> None:
         s = self.state
@@ -404,6 +415,7 @@ class Game:
             yield from renaissance.gain_steps(s, event)              # Renaissance: Academy, Guildhall, Road Network, Cargo Ship, Innovation
             yield from menagerie.after_gain_steps(s, event)          # Menagerie: Exile, Invest, Livery, Way of the Monkey / Seal
             yield from allies.after_gain_steps(s, event)             # Allies: Guildmaster, Garrison, Skirmisher and the Allies that trigger on a gain
+            yield from plunder.after_gain_steps(s, event)            # Plunder: Traits, Rush, Mirror, Mining Road, waiting Durations, Mapmaker, Stowaway
             if s.current_player == player and get_card(event.card).is_type(CardType.VICTORY) and s.turn_counts.get("Groundskeeper"):
                 EffectContext(s, player, "Groundskeeper").add_vp(s.turn_counts["Groundskeeper"])
             over = get_card(event.card).on_overpay                   # "Overpay:" (Guilds)
@@ -506,6 +518,8 @@ class Game:
                 s.supply[event.card] += 1
             elif event.card in s.offsupply:
                 s.offsupply[event.card] += 1
+                if get_card(event.card).is_type(CardType.LOOT):          # Plunder: back on top of the Loot pile
+                    s.loot.insert(0, event.card)
             else:
                 s.trash.append(event.card)
             for tally in (me.gained, me.gained_turn):
@@ -528,7 +542,12 @@ class Game:
         menagerie.start_of_turn(s, player)                     # Menagerie: Gatekeeper and Way of the Monkey end
         allies.start_of_turn(s, player)                        # Allies: Highwaymen and Warlords end
         entries, me.durations = me.durations, []
+        for entry in entries:                                  # Plunder: waiting Durations (Abundance, Cage, Quartermaster...) stay where they are
+            if isinstance(entry.data, dict) and entry.data.get("persist"):
+                me.durations.append(entry)
         for entry in entries:
+            if isinstance(entry.data, dict) and entry.data.get("persist") and entry.handler is None:
+                continue
             if entry.handler is not None:
                 result = entry.handler(EffectContext(s, player, entry.source), entry)
                 if inspect.isgenerator(result):
@@ -537,6 +556,7 @@ class Game:
         yield from nocturne.start_of_turn_steps(s, player)     # Nocturne: held Boons (Blessed Village), Lost in the Woods
         yield from renaissance.start_of_turn_steps(s, player)  # Renaissance: Barracks, Fair, Key and the Projects that act at the start of the turn
         yield from allies.start_of_turn_steps(s, player)       # Allies: the Ally's start-of-turn ability
+        yield from plunder.start_of_turn_steps(s, player)      # Plunder: Shaman, Shy
         while True:
             options = tuple(sorted({c for c in me.hand if get_card(c).play_at_turn_start}))
             if not options:
@@ -566,6 +586,7 @@ class Game:
         was_extra = s.outpost_turn or s.mission_turn or s.seize_turn      # Menagerie: Seize the Day (not a third turn in a row)
         seize_extra = s.seize_turn
         yield from allies.end_of_turn_steps(s, player, was_extra)          # Allies: Island Folk's extra turn
+        yield from plunder.start_cleanup_steps(s, player)                  # Plunder: Friendly and Patient, \"at the start of Clean-up\"
         schemed = []                                         # Hinterlands: Scheme, "at the start of Clean-up"
         for _ in range(s.turn_counts.get("Scheme", 0)):
             kept = {n for e in me.durations for n in e.cards}
@@ -581,6 +602,7 @@ class Game:
         s.frogged = []
         yield from renaissance.cleanup_improve_steps(s, player)   # Renaissance: Improve, "at the start of Clean-up"
         me.durations[:] = [e for e in me.durations if not (e.source == "Cargo Ship" and not e.data["cards"])]    # a Cargo Ship that set nothing aside is discarded
+        me.durations[:] = [e for e in me.durations if not (isinstance(e.data, dict) and e.data.get("expires") and not e.data.get("armed"))]    # Plunder: a Taskmaster that nothing triggered
         # "When you discard this from play" effects, e.g. Alchemist (needs a Potion in play) before Herbalist.
         for card in sorted((c for c in me.in_play if get_card(c).on_cleanup is not None),
                            key=lambda c: (get_card(c).cleanup_order, c)):
@@ -602,6 +624,7 @@ class Game:
         if mission:
             s.mission_next = True
         seize = s.seize_flag and not was_extra and not outpost and not mission and s.possessor is None
+        journey = bool(seize and s.turn_counts.get("journey_keep"))
         s.seize_flag = False
         s.seize_turn = False
         if seize:
@@ -626,6 +649,10 @@ class Game:
                 me.deck.append(card)
                 s.log.append(f"{me.name} puts {card} on their deck (Scheme).", "info", 1)
         yield from renaissance.horn_steps(s, player, remaining)  # Renaissance: Horn
+        if journey:                                            # Plunder: Journey leaves the cards in play
+            staying.extend(remaining)
+            remaining = []
+        yield from plunder.end_cleanup_steps(s, player, remaining)   # Plunder: Trickster, Tireless, Reckless
         for other_index, other in enumerate(s.players):          # Menagerie: Reactions played on another player's turn are discarded in this Clean-up
             if other_index != player and other.in_play:
                 keep = [n for e in other.durations for n in e.cards]
@@ -652,6 +679,7 @@ class Game:
         zones.draw_cards(s, player, (3 if outpost else HAND_SIZE) + me.extra_draw + flag)
         me.extra_draw = 0
         yield from renaissance.star_chart_steps(s)             # Renaissance: Star Chart, after a shuffle in the middle of the draw
+        plunder.end_of_turn_cards(s, player)                   # Plunder: set-aside cards go into hands, Tireless cards onto the deck
         for sq_index, sq in enumerate(s.players):             # Menagerie: Way of the Squirrel, +2 Cards at the end of this turn
             if sq.squirrel:
                 zones.draw_cards(s, sq_index, sq.squirrel)
@@ -696,6 +724,7 @@ class Game:
             if me.protection == 0:
                 s.log.append(f"{me.name}'s protection runs out.", "reveal")
         s.log.append(f"{me.name} ends their turn.", "phase")
+        s.prev_turn = player
 
         if s.mountain_next is not None:                      # Empires: Mountain Pass bidding, after the turn
             yield from self._mountain_steps()

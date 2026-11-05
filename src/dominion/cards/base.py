@@ -51,6 +51,8 @@ class CardType(str, Enum):
     ODYSSEY = "odyssey"              # Allies: the Odysseys
     TOWNSFOLK = "townsfolk"          # Allies: the Townsfolk
     WIZARD = "wizard"                # Allies: the Wizards
+    LOOT = "loot"                    # Plunder: the 15 Loot Treasures (a shuffled pile outside the Supply, gained only with cards that say so)
+    TRAIT = "trait"                  # Plunder: a landscape card laid on one Action or Treasure Kingdom pile for the whole game
 
 
 # An effect takes an EffectContext. It is either a plain function (no player
@@ -110,6 +112,7 @@ class CardDef:
     debt_cost: int = 0                           # Empires: Debt tokens taken when this is bought (the "D" in a cost)
     heirloom: str = ""                           # Nocturne: the Heirloom that replaces one starting Copper in games using this card
     gains_to_hand: bool = False                  # Nocturne: "this is gained to your hand (instead of your discard pile)"
+    hooks: tuple = ()                            # Plunder: (key, fn) pairs, e.g. ("wait", fn): what a Duration waiting for something does when it happens
 
     def __post_init__(self) -> None:
         if not self.name:

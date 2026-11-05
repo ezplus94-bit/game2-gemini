@@ -23,6 +23,8 @@ def card_cost(state: GameState, name: str) -> int:
     if state.players[state.current_player].tokens.get("-$2 Cost") == state.stack_of.get(name_, name_):   # Adventures: Ferry's token
         reduction += 2
     reduction += state.pile_tokens.get(state.stack_of.get(name_, name_), 0)      # Allies: Family of Inventors
+    if state.traits and state.traits.get(state.stack_of.get(name_, name_)) == "Cheap":                 # Plunder: Cheap cards cost $1 less
+        reduction += 1
     if "Canal" in state.players[state.current_player].projects:                                       # Renaissance: Canal, during your turns
         reduction += 1
     return max(0, card.cost - reduction)

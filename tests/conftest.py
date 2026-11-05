@@ -26,3 +26,18 @@ def server():
     yield port
     srv.should_exit = True
     thread.join(5)
+
+
+@pytest.fixture(autouse=True)
+def _no_random_inherited(monkeypatch):
+    """Plunder's Inherited Trait asks every player a question before the first turn. Tests that start random games and then press
+    End phase would sometimes meet that question, so random landscape picks skip it (tests that ask for Inherited by name still get it)."""
+    from dominion.engine import setup
+
+    original = setup._resolve_events
+
+    def resolve(requested, kingdom, seed):
+        picked = original(requested, kingdom, seed)
+        return picked if requested is not None else [n for n in picked if n != "Inherited"]
+
+    monkeypatch.setattr(setup, "_resolve_events", resolve)

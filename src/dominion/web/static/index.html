@@ -802,7 +802,7 @@
     c.appendChild(el("span", "name", blind ? "???" : faceName(name)));
     if (blind) {
       c.appendChild(el("span", "cost", "?"));
-    } else if (info.cost !== "?" && !["landmark", "way", "boon", "hex", "state", "artifact"].some((t) => (info.types || []).includes(t))) {
+    } else if (info.cost !== "?" && !["landmark", "way", "trait", "boon", "hex", "state", "artifact"].some((t) => (info.types || []).includes(t))) {
       const price = priceOf(info);
       const cost = el("span", "cost" + (price < info.cost ? " cheaper" : ""));
       if (price < info.cost) cost.appendChild(el("s", "", String(info.cost)));
@@ -901,7 +901,7 @@
       body.appendChild(cardEl(name, { size: "big" }));
       const t = el("div", "help-text");
       t.appendChild(el("p", "", info.text || ""));
-      const bits = [info.types.includes("landmark") ? "Landmark" : info.types.includes("way") ? "Way" : ("Cost $" + info.cost + (info.potion_cost ? " + Potion" : "") + (info.debt_cost ? " + " + info.debt_cost + " Debt" : "")), typeLabel(info.types)];
+      const bits = [info.types.includes("landmark") ? "Landmark" : info.types.includes("way") ? "Way" : info.types.includes("trait") ? "Trait" : ("Cost $" + info.cost + (info.potion_cost ? " + Potion" : "") + (info.debt_cost ? " + " + info.debt_cost + " Debt" : "")), typeLabel(info.types)];
       if (info.expansion) bits.push(info.expansion === "Catastrophe" ? "Catastrophe (house rule)" : info.expansion + " set");
       t.appendChild(el("p", "muted", bits.join("  |  ")));
       if (view) {
@@ -1286,6 +1286,7 @@
       }
       if (p.delayed && p.delayed.length) tags.appendChild(el("span", "tag gold", "Set aside for next turn: " + p.delayed.join(", ")));
       if (p.cargo_aside && p.cargo_aside.length) tags.appendChild(el("span", "tag gold", "Cargo Ship: " + p.cargo_aside.join(", ")));
+      if (p.plunder_aside_n) tags.appendChild(el("span", "tag gold", "Set aside: " + (Array.isArray(p.plunder_aside) ? p.plunder_aside.join(", ") : p.plunder_aside_n + " card(s)")));
       if (p.research_aside > 0) tags.appendChild(el("span", "tag", "Research: " + p.research_aside + " card" + (p.research_aside > 1 ? "s" : "") + " set aside"));
       Object.entries(v.artifacts || {}).forEach(([name, holder]) => { if (holder === v.players.indexOf(p)) tags.appendChild(el("span", "tag gold", "Artifact: " + name)); });
       if (p.debt > 0) tags.appendChild(el("span", "tag bad", "Debt: " + p.debt));
@@ -1360,9 +1361,14 @@
 
     const evBox = $("supply-events");                       // Adventures Events
     evBox.replaceChildren();
-    $("events-row").hidden = !((v.events && v.events.length) || (v.landmarks && v.landmarks.length) || (v.ways && v.ways.length));
+    $("events-row").hidden = !((v.events && v.events.length) || (v.landmarks && v.landmarks.length) || (v.ways && v.ways.length) || (v.traits && v.traits.length));
     (v.ways || []).forEach((w) => {                            // Menagerie Ways: each Action you play may use the Way instead of its own text
       const c = cardEl(w.name, { sub: "Way" + (w.name === "Way of the Mouse" && v.mouse ? " | plays " + v.mouse : "") });
+      makeInfoOnly(c);
+      evBox.appendChild(c);
+    });
+    (v.traits || []).forEach((tr) => {                         // Plunder Traits: each lies on one Kingdom pile for the whole game
+      const c = cardEl(tr.name, { sub: "Trait | on " + tr.pile });
       makeInfoOnly(c);
       evBox.appendChild(c);
     });

@@ -27,6 +27,7 @@ from .state import GameStatus
 
 BASIC_PILES = ("Copper", "Silver", "Gold", "Platinum", "Estate", "Duchy", "Province", "Colony", "Curse", "Potion")
 LOG_LINES = 200
+from .plunder import LOOT_NAMES as LOOT_CARDS    # noqa: E402
 
 
 def card_info(name: str, state=None) -> dict:
@@ -72,6 +73,7 @@ def build_view(game, player: int) -> dict:
             info["split"] = ({n: s.supply.get(n, 0) for n in dict.fromkeys(s.stack_cards[name])}
                              if name in s.stack_cards and name not in ("Knights", "Ruins") else None)
             info["walled_by"] = s.walls.get(shown)     # Fortnite: index of the player whose wall stands here, or None
+            info["trait"] = s.traits.get(name)         # Plunder: the Trait lying on this pile
             piles.append(info)
 
     players = []
@@ -116,6 +118,8 @@ def build_view(game, player: int) -> dict:
             "invested": {k: min(v, p.exile.count(k)) for k, v in p.invested.items() if p.exile.count(k)},
             "delayed": list(p.delayed),                   # set aside by Delay, Reap or Way of the Turtle (face up)
             "cargo_aside": list(p.cargo_aside),           # set aside face up on Cargo Ship
+            "plunder_aside": list(p.plunder_aside) if i == player else len(p.plunder_aside),    # Plunder: set aside on Cage, Grotto, Quartermaster... (only the owner sees them)
+            "plunder_aside_n": len(p.plunder_aside),
             "research_aside": len(p.research_aside),      # face down on Research: only the count shows
             "coffers": p.coffers,
             "possessed_by": s.possessor if (s.possessor is not None and i == s.current_player) else None,
@@ -144,11 +148,15 @@ def build_view(game, player: int) -> dict:
     else:
         legal = [action_to_dict(a) for a in legal_actions(s, player) if not isinstance(a, Choose)]
 
-    names = {name for name in s.supply} | set(s.offsupply) | set(s.events) | set(s.landmarks) | set(s.ways) | ({s.ally} if s.ally else set())
+    names = {name for name in s.supply} | set(s.offsupply) | set(s.events) | set(s.landmarks) | set(s.ways) | ({s.ally} if s.ally else set()) | set(s.traits.values())
     names |= {c for p in s.players for c in (*p.exile, *p.delayed)}
     names |= set(s.trash) | set(me.hand) | {c for p in s.players for c in (*p.in_play, *p.tavern, *p.ghosted)}
     names |= {get_card(n).heirloom for n in (*s.kingdom, *([s.bane] if s.bane else [])) if get_card(n).heirloom}
+    names |= set(me.plunder_aside)
     cards = {n: card_info(n, s) for n in sorted(names)}
+    if s.loot or any(s.offsupply.get(n, 0) for n in LOOT_CARDS):
+        cards["Loot"] = {"name": "Loot", "cost": 7, "potion_cost": 0, "debt_cost": 0, "overpay": False, "types": ["loot"], "min_players": 1, "expansion": "Plunder",
+                         "companions": [], "text": "The Loot pile is shuffled and not in the Supply. Cards that say \"gain a Loot\" gain its top card (revealed). Each Loot is a Treasure costing $7."}
     pseudo = {}                                   # Boons, Hexes and States are not cards but are shown like them
     if s.boons or s.boons_discard or s.druid_boons or s.kept_boons:
         pseudo.update({n: ("boon", t) for n, t in BOONS.items()})
@@ -175,7 +183,9 @@ def build_view(game, player: int) -> dict:
         "trade_mat": s.trade_mat,
         "coffers": s.players[s.current_player].coffers,       # the tokens of whoever's turn it is
         "villagers": s.players[s.current_player].villagers,
-        "offsupply": [{"name": n, "count": c, "ferryman": n == s.ferryman} for n, c in sorted(s.offsupply.items())],
+        "offsupply": [{"name": n, "count": c, "ferryman": n == s.ferryman} for n, c in sorted(s.offsupply.items()) if n not in LOOT_CARDS]
+                     + ([{"name": "Loot", "count": len(s.loot), "ferryman": False}] if s.loot or any(s.offsupply.get(n, 0) for n in LOOT_CARDS) else []),
+        "traits": [{**card_info(n, s), "pile": pile} for pile, n in s.traits.items()],
         "bane": s.bane,
         "events": [{**card_info(n, s), "once": get_card(n).once_per_turn, "used": bool(s.turn_counts.get("event:" + n)),
                     "owners": [i for i, p in enumerate(s.players) if n in p.projects]} for n in s.events],

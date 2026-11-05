@@ -174,6 +174,9 @@ class PlayerState:
     squirrel: int = 0                                # Menagerie: cards Way of the Squirrel draws at the end of this turn
     favors: int = 0                                  # Allies: Favor tokens
     garrison_tokens: int = 0                         # Allies: tokens on this player's Garrisons in play (drawn as cards next turn)
+    plunder_aside: list = field(default_factory=list)  # Plunder: cards set aside on Cage, Grotto, Quartermaster, and by Prepare, Hasty and Patient (still yours)
+    eot_hand: list = field(default_factory=list)       # Plunder: cards that go into the hand at the end of this turn (Puzzle Box, Deliver, Cage, Trickster)
+    eot_deck: list = field(default_factory=list)       # Plunder: Tireless cards that go onto the deck at the end of this turn
     seize_used: bool = False                         # Menagerie: Seize the Day has been bought (once per game)
     trashed_turn: int = 0                            # Menagerie: cards this player trashed during their current turn (Goatherd)
     trashed_last: int = 0                            # ... and during their previous turn
@@ -185,7 +188,7 @@ class PlayerState:
         return [*self.deck, *self.hand, *self.discard, *self.in_play, *self.set_aside,
                 *self.island_mat, *self.village_mat, *self.haven, *self.farmhands, *self.joust_aside,
                 *self.tavern, *self.saved, *self.archived, *self.crypt, *self.ghosted, *self.hounds,
-                *self.cargo_aside, *self.research_aside, *self.exile, *self.delayed]
+                *self.cargo_aside, *self.research_aside, *self.exile, *self.delayed, *self.plunder_aside, *self.eot_hand, *self.eot_deck]
 
 
 @dataclass
@@ -303,6 +306,11 @@ class GameState:
     voyage_next: bool = False         # the next turn (an extra turn that is about to start) is a Voyage turn
     hand_plays: int = 0               # cards played from the hand this turn (Voyage)
     elder_cards: list = field(default_factory=list)   # Allies: cards Elder is playing right now (they get an extra choice)
+    traits: dict = field(default_factory=dict)        # Plunder: Kingdom pile -> the Trait lying on it
+    loot: list = field(default_factory=list)          # Plunder: the Loot pile, top card first (the counts are also in offsupply)
+    shaman: bool = False              # Plunder: Shaman is in the game (everyone gains from the trash at the start of their turn)
+    coin_ticks: int = 0               # Plunder: how many times a card gave +$ so far (Harbor Village asks whether an Action did)
+    prev_turn: Optional[int] = None   # Plunder: who took the previous turn (Journey)
     seize_flag: bool = False          # Seize the Day was bought this turn
     seize_next: bool = False          # the next turn is the same player's Seize the Day turn
     seize_turn: bool = False          # the current turn is a Seize the Day turn (it does not count as a turn taken, and no third turn in a row)

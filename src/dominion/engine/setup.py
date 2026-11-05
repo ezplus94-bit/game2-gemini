@@ -6,8 +6,8 @@ import random
 from dataclasses import dataclass, field, replace
 from typing import Optional
 
-from ..cards import CardType, UnknownCardError, event_cards, expansions as all_expansions, get_card, kingdom_cards, landmark_cards, project_cards, way_cards
-from . import allies as ally_rules, landmarks as landmark_rules, menagerie as menagerie_rules, nocturne as nocturne_rules, renaissance as renaissance_rules, zones
+from ..cards import CardType, UnknownCardError, event_cards, expansions as all_expansions, get_card, kingdom_cards, landmark_cards, project_cards, trait_cards, way_cards
+from . import allies as ally_rules, landmarks as landmark_rules, menagerie as menagerie_rules, nocturne as nocturne_rules, plunder as plunder_rules, renaissance as renaissance_rules, zones
 from .constants import (
     CATASTROPHE_PILE_SIZE, EMPTY_PILE_LIMIT, HAND_SIZE, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS, PLATINUM_PILE_SIZE,
     POTION_PILE_SIZE,
@@ -55,6 +55,7 @@ def new_game(config: GameConfig) -> Game:
     events = [n for n in chosen_extras if CardType.EVENT in get_card(n).types or CardType.PROJECT in get_card(n).types]     # (Projects are bought like Events)
     landmark_names = [n for n in chosen_extras if CardType.LANDMARK in get_card(n).types]
     way_names = [n for n in chosen_extras if CardType.WAY in get_card(n).types]
+    trait_names = [n for n in chosen_extras if CardType.TRAIT in get_card(n).types]
     mouse = menagerie_rules.pick_mouse_card(taken, seed, expansions, MULTI_PILES) if "Way of the Mouse" in way_names else None
     piles_used = [card for pile in taken if pile in ALLIES_SPLITS for card in ALLIES_SPLITS[pile]]      # Allies: the cards inside the split piles
     used = [*taken, *piles_used, *([ferryman] if ferryman else []), *([mouse] if mouse else [])]
@@ -85,6 +86,11 @@ def new_game(config: GameConfig) -> Game:
     state.landmarks = tuple(landmark_names)
     state.ways = tuple(way_names)
     state.ally = ally
+    state.shaman = "Shaman" in used                            # Plunder
+    if trait_names:                                            # Plunder: each Trait lies on a random Action or Treasure Kingdom pile
+        state.traits = plunder_rules.pick_trait_piles(trait_names, list(kingdom), MULTI_PILES, seed)
+    if any(n in plunder_rules.LOOT_USERS for n in [*used, *chosen_extras]):
+        plunder_rules.build_loot(state, seed)                  # Plunder: the shuffled Loot pile
     if ally is not None:                                       # Allies: Favors (one each, five each with Importer)
         for p in state.players:
             p.favors = 5 if "Importer" in used else 1
@@ -111,8 +117,12 @@ def new_game(config: GameConfig) -> Game:
     state.log.append(f"Turn 1 - {players[state.current_player].name}", "turn")
 
     resolved = replace(config, seed=seed, kingdom=list(kingdom), catastrophes=list(catastrophes), expansions=expansions,
-                       colonies=colonies, bane=bane, ferryman=ferryman, shelters=shelters, events=[*events, *landmark_names, *way_names], ally=ally)
-    return Game(state, resolved)
+                       colonies=colonies, bane=bane, ferryman=ferryman, shelters=shelters, events=[*events, *landmark_names, *way_names, *trait_names], ally=ally)
+    game = Game(state, resolved)
+    inherited = [pile for pile, name in state.traits.items() if name == "Inherited"]
+    if inherited:                                              # Plunder: Inherited: everybody picks a starting card to swap, in turn order
+        game._advance(plunder_rules.inherited_steps(state, inherited[0]), None, "Inherited")
+    return game
 
 
 def replay(config: GameConfig, history: list) -> Game:
@@ -167,7 +177,7 @@ def _resolve_events(requested: Optional[list], kingdom: list, seed: int) -> list
     pool holds the Adventures Events, when an Empires card is in it the pool also holds the Empires Events and Landmarks, when a
     Renaissance card is in it the pool also holds the Projects;
     two are picked from the seed. No such card means none. An empty list means none."""
-    everything = [*event_cards(), *landmark_cards(), *project_cards(), *way_cards()]
+    everything = [*event_cards(), *landmark_cards(), *project_cards(), *way_cards(), *trait_cards()]
     if requested is not None:
         picked = list(requested)
         if len(picked) > 2 or len(set(picked)) != len(picked):
@@ -177,7 +187,8 @@ def _resolve_events(requested: Optional[list], kingdom: list, seed: int) -> list
                 raise ValueError(f"Unknown Event, Landmark, Project or Way: {name}")
         return sorted(picked, key=lambda n: (get_card(n).cost, n))
     sets = {get_card(n).expansion for n in kingdom}
-    pool = [*event_cards([e for e in ("Adventures", "Empires", "Menagerie") if e in sets]),
+    pool = [*event_cards([e for e in ("Adventures", "Empires", "Menagerie", "Plunder") if e in sets]),
+            *(trait_cards(["Plunder"]) if "Plunder" in sets else []),
             *(landmark_cards(["Empires"]) if "Empires" in sets else []),
             *(project_cards(["Renaissance"]) if "Renaissance" in sets else []),
             *(way_cards(["Menagerie"]) if "Menagerie" in sets else [])]
