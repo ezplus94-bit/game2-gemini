@@ -409,3 +409,13 @@ request from the players. It leaks an aggregate, not card identities.
   `empty_piles()` now counts a split/mixed pile once (never its single cards).
 * `EffectContext.choose_modes` is the "choose one" helper that Elder extends (`GameState.elder_cards`). Extra turns: `queue_own_extra_turn` shares `seize_flag/next/turn` with Seize the Day; `voyage_*` and
   `hand_plays` implement Voyage's 3-card limit in `rules._play_blocked`. `zones.take_top_cards` stops before a shuffle for the Orders (`star_draws` entry marked `"ally"`).
+
+### Plunder hooks (update 24)
+* `cards/plunder.py` holds all 85 cards. `engine/plunder.py` holds the rules that need the engine: `fire_waits` (a Duration with `DurationEntry.data = {"wait": kind, "persist": True}` stays in play, also through its owner's
+  start of turn, until `after_gain_steps` / `after_play_steps` / `treasure_played_first` fires its `("wait", fn)` entry in `CardDef.hooks`; `expires`/`armed` is Taskmaster's "only if something triggered it"),
+  `after_gain_steps` (gain Traits, Rush, Mirror, Insignia, Deliver, Mining Road, Mapmaker/Stowaway reactions), `start_of_turn_steps` (Shaman, Shy), `start_cleanup_steps` (Friendly, Patient),
+  `end_cleanup_steps` (Trickster, Tireless, Reckless), `end_of_turn_cards` (`PlayerState.eot_hand/eot_deck`), `shuffle_steps` (Fated, Avoid; `star_draws` entry marked `"plunder"`), `inherited_steps`, `build_loot`.
+* `GameState.traits` (pile -> Trait) and `GameState.loot` (shuffled pile, top first; the counts are also in `offsupply` so cards are conserved and `zones.gain_offsupply` removes the card from `loot`).
+  `PlayerState.plunder_aside` is the shared zone for cards set aside by Cage, Grotto, Quartermaster, Prepare, Hasty and Patient. Cheap is in `costs.card_cost`, Reckless in `effects.play_effect/resolve_treasure`.
+* `plunder.before_play/after_play_steps` wrap every Action and Treasure resolution (`Game._play_steps`, `EffectContext.resolve/resolve_treasure`): Harbor Village (`state.coin_ticks` counts +$ gains), Frigate, Flagship
+  (a replay of the next non-Command Action) and Inspiring. Journey sets `seize_flag` plus `turn_counts["journey_keep"]` (nothing is discarded from play in that Clean-up).
