@@ -20,6 +20,7 @@ from ..cards.plunder import play_aside_all, play_from_hand
 from .cardtypes import has_type, is_treasure
 from .costs import card_cost
 from .effects import EffectContext
+from . import zones
 from .state import DurationEntry, GameState
 
 LOOT_USERS = frozenset({"Cutthroat", "Jewelled Egg", "Pickaxe", "Sack of Loot", "Search", "Wealthy Village",
@@ -201,6 +202,8 @@ def after_play_steps(state: GameState, player: int, card: str, snap: tuple):
     me = state.players[player]
     ticks, armed = snap
     is_action = definition.is_type(CardType.ACTION)
+    from . import risingsun
+    risingsun.after_play_steps(state, player, card)                # Rising Sun: Approaching Army, Great Leader
     if is_action and armed and state.current_player == player:
         n = min(armed, state.turn_counts.get("hv_armed", 0))
         if n > 0:
@@ -225,9 +228,11 @@ def after_play_steps(state: GameState, player: int, card: str, snap: tuple):
             waiting = [e for e in me.durations if isinstance(e.data, dict) and e.data.get("wait") == "play_action"]
             for e in waiting:
                 me.durations.remove(e)
-            for _ in waiting:
-                state.log.append(f"Flagship: {card} is replayed.", "play", 1)
-                yield from EffectContext(state, player, "Flagship").resolve(card)
+            daimyo = state.turn_counts.get("daimyo", 0) if state.current_player == player else 0      # Rising Sun: Daimyo replays it too
+            state.turn_counts["daimyo"] = 0
+            for source in [*(["Flagship"] * len(waiting)), *(["Daimyo"] * daimyo)]:
+                state.log.append(f"{source}: {card} is replayed.", "play", 1)
+                yield from EffectContext(state, player, source).resolve(card)
     if state.current_player == player and trait_of(state, card) == "Inspiring" and (is_action or definition.is_type(CardType.TREASURE)):
         in_play = set(me.in_play)
         ctx = EffectContext(state, player, card)
@@ -375,7 +380,7 @@ def shuffle_steps(state: GameState, player: int):
             pool.remove(c)
             bottom.append(c)
     shuffled = list(pool)
-    state.rng.shuffle(shuffled)
+    zones.shuffle_deck(state, shuffled)
     me.deck = bottom + shuffled + list(reversed(top))
     me.discard = kept
     if kept or top or bottom:

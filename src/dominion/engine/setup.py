@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from ..cards import CardType, UnknownCardError, event_cards, expansions as all_expansions, get_card, kingdom_cards, landmark_cards, project_cards, trait_cards, way_cards
-from . import allies as ally_rules, landmarks as landmark_rules, menagerie as menagerie_rules, nocturne as nocturne_rules, plunder as plunder_rules, renaissance as renaissance_rules, zones
+from . import allies as ally_rules, landmarks as landmark_rules, menagerie as menagerie_rules, nocturne as nocturne_rules, plunder as plunder_rules, renaissance as renaissance_rules, risingsun as risingsun_rules, zones
 from .constants import (
     CATASTROPHE_PILE_SIZE, EMPTY_PILE_LIMIT, HAND_SIZE, KINGDOM_SIZE, MAX_PLAYERS, MIN_PLAYERS, PLATINUM_PILE_SIZE,
     POTION_PILE_SIZE,
@@ -45,13 +45,18 @@ def new_game(config: GameConfig) -> Game:
     seed = config.seed if config.seed is not None else random.SystemRandom().randrange(2**32)
     expansions = _resolve_expansions(config.expansions)
     kingdom = _resolve_kingdom(config.kingdom, seed, expansions)
+    base_kingdom = list(kingdom)                                                  # (what the host chose: Approaching Army's extra pile is added from the seed)
+    requested_events = [n for n in (config.events or []) if CardType.PROPHECY not in get_card(n).types] if config.events is not None else None
+    prophecy = risingsun_rules.pick_prophecy(config.events, kingdom, seed)        # Rising Sun: one Prophecy whenever an Omen is in the Kingdom
+    if prophecy == "Approaching Army":                                            # ... which adds an Attack pile to the Supply
+        kingdom = [*kingdom, risingsun_rules.pick_attack_pile(kingdom, seed, expansions, MULTI_PILES)]
     catastrophes = _resolve_catastrophes(config.catastrophes, len(names))
     fenced = _with_companions(catastrophes)
     colonies = _resolve_colonies(config.colonies, kingdom, seed)
     bane = _resolve_extra_pile(config.bane, "Young Witch", kingdom, seed, (2, 3), expansions)
     taken = [*kingdom, *([bane] if bane else [])]
     ferryman = _resolve_extra_pile(config.ferryman, "Ferryman", taken, seed, (3, 4), expansions)
-    chosen_extras = _resolve_events(config.events, kingdom, seed)
+    chosen_extras = _resolve_events(requested_events, kingdom, seed)
     events = [n for n in chosen_extras if CardType.EVENT in get_card(n).types or CardType.PROJECT in get_card(n).types]     # (Projects are bought like Events)
     landmark_names = [n for n in chosen_extras if CardType.LANDMARK in get_card(n).types]
     way_names = [n for n in chosen_extras if CardType.WAY in get_card(n).types]
@@ -87,6 +92,11 @@ def new_game(config: GameConfig) -> Game:
     state.ways = tuple(way_names)
     state.ally = ally
     state.shaman = "Shaman" in used                            # Plunder
+    state.card_sets = expansions                               # Rising Sun: Divine Wind deals new piles from these sets
+    if prophecy:
+        state.prophecy, state.suns = prophecy, risingsun_rules.SUNS[min(max(len(names), 2), 6)]
+    if "Riverboat" in used:                                    # Rising Sun: Riverboat's setup
+        state.riverboat = risingsun_rules.pick_riverboat(used, seed, expansions, MULTI_PILES)
     if trait_names:                                            # Plunder: each Trait lies on a random Action or Treasure Kingdom pile
         state.traits = plunder_rules.pick_trait_piles(trait_names, list(kingdom), MULTI_PILES, seed)
     if any(n in plunder_rules.LOOT_USERS for n in [*used, *chosen_extras]):
@@ -116,8 +126,8 @@ def new_game(config: GameConfig) -> Game:
     state.log.append(f"{players[state.current_player].name} goes first.", "system")
     state.log.append(f"Turn 1 - {players[state.current_player].name}", "turn")
 
-    resolved = replace(config, seed=seed, kingdom=list(kingdom), catastrophes=list(catastrophes), expansions=expansions,
-                       colonies=colonies, bane=bane, ferryman=ferryman, shelters=shelters, events=[*events, *landmark_names, *way_names, *trait_names], ally=ally)
+    resolved = replace(config, seed=seed, kingdom=list(base_kingdom), catastrophes=list(catastrophes), expansions=expansions,
+                       colonies=colonies, bane=bane, ferryman=ferryman, shelters=shelters, events=[*events, *landmark_names, *way_names, *trait_names, *([prophecy] if prophecy else [])], ally=ally)
     game = Game(state, resolved)
     inherited = [pile for pile, name in state.traits.items() if name == "Inherited"]
     if inherited:                                              # Plunder: Inherited: everybody picks a starting card to swap, in turn order
@@ -187,7 +197,7 @@ def _resolve_events(requested: Optional[list], kingdom: list, seed: int) -> list
                 raise ValueError(f"Unknown Event, Landmark, Project or Way: {name}")
         return sorted(picked, key=lambda n: (get_card(n).cost, n))
     sets = {get_card(n).expansion for n in kingdom}
-    pool = [*event_cards([e for e in ("Adventures", "Empires", "Menagerie", "Plunder") if e in sets]),
+    pool = [*event_cards([e for e in ("Adventures", "Empires", "Menagerie", "Plunder", "Rising Sun") if e in sets]),
             *(trait_cards(["Plunder"]) if "Plunder" in sets else []),
             *(landmark_cards(["Empires"]) if "Empires" in sets else []),
             *(project_cards(["Renaissance"]) if "Renaissance" in sets else []),

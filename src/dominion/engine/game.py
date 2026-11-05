@@ -17,13 +17,13 @@ import inspect
 from typing import Optional
 
 from ..cards import CardType, get_card
-from . import allies, landmarks, menagerie, nocturne, plunder, renaissance, zones
+from . import allies, landmarks, menagerie, nocturne, plunder, renaissance, risingsun, zones
 from .cardtypes import is_plain_treasure, is_treasure, treasure_coins
 from .actions import (
     Action, Buy, BuyEvent, Cheat, Choose, EndGame, EndPhase, PayDebt, PlayAction, PlayAllTreasures, PlayTreasure, Resign, SpendCoffers, SpendVillager,
 )
 from .constants import CHEAT_AMOUNT, EXODIA_PIECES, HAND_SIZE
-from .costs import card_cost
+from .costs import card_cost, spend_buy
 from .effects import EffectContext, ally_after_play, apply_play_bonuses, call_steps, citadel_check, fire_triggers, play_effect, urchin_steps
 from .rules import IllegalActionError, acting_player, is_game_over, legal_actions, validate
 from .scoring import determine_winners, final_scores
@@ -63,7 +63,7 @@ class Game:
         turn = self.state.turn_number
         owner = self.state.current_player        # whose cards are played (the possessed player's under Possession)
         if isinstance(action, PlayAction):
-            self._play_action(owner, action.card)
+            self._play_action(owner, action.card, action.from_deck)
         elif isinstance(action, PlayTreasure):
             self._play_treasure(owner, action.card)
         elif isinstance(action, PlayAllTreasures):
@@ -118,19 +118,20 @@ class Game:
                 return
 
     # ------------------------------------------------------------ handlers
-    def _play_action(self, player: int, card: str) -> None:
+    def _play_action(self, player: int, card: str, from_deck: bool = False) -> None:
         s = self.state
         me = s.players[player]
-        me.hand.remove(card)
+        (me.deck if from_deck else me.hand).remove(card)         # (a Shadow card can come from anywhere in the deck)
         me.in_play.append(card)
         s.turn_counts["any_play"] = 1                            # Plunder: a Treasure is no longer the first card played (Landing Party)
         night = s.phase is Phase.NIGHT                           # Nocturne: Night cards cost no Action; only Actions (Werewolf) count as plays
         if not night:
             s.actions -= 1
-            s.hand_plays += 1                                    # Voyage counts cards played from the hand
+            if not from_deck:
+                s.hand_plays += 1                                # Voyage counts cards played from the hand
         if not night or get_card(card).is_type(CardType.ACTION):
             s.plays_this_turn += 1
-        s.log.append(f"{me.name} plays {card}{' (Night phase)' if night else ''}.", "play")
+        s.log.append(f"{me.name} plays {card}{' (Night phase)' if night else ''}{' from their deck' if from_deck else ''}.", "play")
         self._advance(self._play_steps(player, card), None, card)
 
     def _play_steps(self, player: int, card: str):
@@ -142,7 +143,7 @@ class Game:
         yield from urchin_steps(s, player, card)
         apply_play_bonuses(s, player, card)
         on_play = get_card(card).on_play
-        if on_play is None:                                        # Adventures: an Estate that Inheritance made an Action
+        if on_play is None and s.players[player].inherited is not None:     # Adventures: an Estate that Inheritance made an Action
             on_play = get_card(s.players[player].inherited).on_play
         yield from play_effect(s, player, card, on_play)           # Kiln, then a Way (Menagerie) or the card's effect (Enchantress may replace it)
         yield from call_steps(s, player, "after_action", card)    # Adventures: Royal Carriage, Coin of the Realm
@@ -192,7 +193,7 @@ class Game:
         taker = zones.beneficiary(s, player)
         owed = get_card(card_name).debt_cost
         pile = s.stack_of.get(card_name, card_name)
-        extra = s.pile_debt.get(pile, 0)
+        extra = 0 if risingsun.active(s, "Harsh Winter") else s.pile_debt.get(pile, 0)      # (Harsh Winter takes the tokens itself, for every gain)
         if extra:
             s.pile_debt[pile] = 0
         if owed + extra:
@@ -223,7 +224,7 @@ class Game:
             s.coins -= card_cost(s, card) + overpay
         s.overpaid = overpay
         s.potions -= get_card(card).potion_cost
-        s.buys -= 1
+        spend_buy(s)
         s.buying = True                                       # the gain below is a purchase (Hoard, Goons, Talisman)
         s.bought_turn += 1
         zones.gain_card(s, player, card)
@@ -247,7 +248,7 @@ class Game:
         s = self.state
         event = get_card(name)
         s.coins -= event.cost
-        s.buys -= 1
+        spend_buy(s)
         if event.debt_cost:
             s.players[player].debt += event.debt_cost
             s.log.append(f"{s.players[player].name} takes {event.debt_cost} Debt tokens ({s.players[player].debt} in all).", "info", 1)
@@ -416,6 +417,7 @@ class Game:
             yield from menagerie.after_gain_steps(s, event)          # Menagerie: Exile, Invest, Livery, Way of the Monkey / Seal
             yield from allies.after_gain_steps(s, event)             # Allies: Guildmaster, Garrison, Skirmisher and the Allies that trigger on a gain
             yield from plunder.after_gain_steps(s, event)            # Plunder: Traits, Rush, Mirror, Mining Road, waiting Durations, Mapmaker, Stowaway
+            yield from risingsun.after_gain_steps(s, event)          # Rising Sun: the Prophecies that react to a gain, and the Gold Kintsugi remembers
             if s.current_player == player and get_card(event.card).is_type(CardType.VICTORY) and s.turn_counts.get("Groundskeeper"):
                 EffectContext(s, player, "Groundskeeper").add_vp(s.turn_counts["Groundskeeper"])
             over = get_card(event.card).on_overpay                   # "Overpay:" (Guilds)
@@ -557,6 +559,7 @@ class Game:
         yield from renaissance.start_of_turn_steps(s, player)  # Renaissance: Barracks, Fair, Key and the Projects that act at the start of the turn
         yield from allies.start_of_turn_steps(s, player)       # Allies: the Ally's start-of-turn ability
         yield from plunder.start_of_turn_steps(s, player)      # Plunder: Shaman, Shy
+        yield from risingsun.start_of_turn_steps(s, player)    # Rising Sun: Kind Emperor, Sickness
         while True:
             options = tuple(sorted({c for c in me.hand if get_card(c).play_at_turn_start}))
             if not options:
@@ -587,6 +590,7 @@ class Game:
         seize_extra = s.seize_turn
         yield from allies.end_of_turn_steps(s, player, was_extra)          # Allies: Island Folk's extra turn
         yield from plunder.start_cleanup_steps(s, player)                  # Plunder: Friendly and Patient, \"at the start of Clean-up\"
+        yield from risingsun.start_cleanup_steps(s, player)                # Rising Sun: River Shrine, Biding Time
         schemed = []                                         # Hinterlands: Scheme, "at the start of Clean-up"
         for _ in range(s.turn_counts.get("Scheme", 0)):
             kept = {n for e in me.durations for n in e.cards}
@@ -653,6 +657,7 @@ class Game:
             staying.extend(remaining)
             remaining = []
         yield from plunder.end_cleanup_steps(s, player, remaining)   # Plunder: Trickster, Tireless, Reckless
+        risingsun.end_cleanup_steps(s, player, remaining)            # Rising Sun: Panic
         for other_index, other in enumerate(s.players):          # Menagerie: Reactions played on another player's turn are discarded in this Clean-up
             if other_index != player and other.in_play:
                 keep = [n for e in other.durations for n in e.cards]

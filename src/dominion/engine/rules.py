@@ -20,9 +20,9 @@ from .actions import (
     Action, Buy, BuyEvent, Cheat, Choose, Decision, EndGame, EndPhase, PayDebt, PlayAction, PlayAllTreasures, PlayTreasure,
     Resign, SpendCoffers, SpendVillager,
 )
-from .cardtypes import is_plain_treasure, is_treasure
+from .cardtypes import has_type, is_plain_treasure, is_treasure
 from .constants import CHEAT_KINDS
-from .costs import card_cost, is_buried, is_walled
+from .costs import can_buy, card_cost, is_buried, is_walled
 from .state import GameState, GameStatus, Phase
 
 
@@ -129,12 +129,15 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
             return "Actions can only be played during the Action phase."
         if state.actions < 1:
             return "You have no Actions left."
-        if action.card not in me.hand:
+        if action.from_deck:                                    # Rising Sun: a Shadow card can be played from the deck
+            if action.card not in me.deck or not get_card(action.card).is_type(CardType.SHADOW):
+                return f"{action.card} is not a Shadow card in your deck."
+        elif action.card not in me.hand:
             return f"{action.card} is not in your hand."
         blocked = _play_blocked(state, me, action.card)
         if blocked:
             return blocked
-        if not _is_action(me, action.card):
+        if not _is_action(me, action.card, state):
             return f"{action.card} is not an Action card."
         return None
 
@@ -162,7 +165,7 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
         event = get_card(action.card)
         if me.debt > 0:
             return f"You owe {me.debt} Debt token(s): pay it off before buying anything."
-        if state.buys < 1:
+        if not can_buy(state):
             return "You have no Buys left."
         if event.cost > state.coins:
             return f"{action.card} costs ${event.cost} but you only have ${state.coins}."
@@ -185,7 +188,7 @@ def validate(state: GameState, player: int, action: Action) -> Optional[str]:
             return "You may not buy cards this turn."
         if me.debt > 0:
             return f"You owe {me.debt} Debt token(s): pay it off before buying anything."
-        if state.buys < 1:
+        if not can_buy(state):
             return "You have no Buys left."
         if action.card not in state.supply:
             return f"{action.card} is not in this game's supply."
@@ -234,8 +237,11 @@ def legal_actions(state: GameState, player: Optional[int] = None) -> list:
     if state.phase is Phase.ACTION:
         if state.actions >= 1:
             for card in sorted(set(me.hand)):
-                if _is_action(me, card) and _play_blocked(state, me, card) is None:
+                if _is_action(me, card, state) and _play_blocked(state, me, card) is None:
                     result.append(PlayAction(card))
+            for card in sorted({c for c in me.deck if get_card(c).is_type(CardType.SHADOW)}):         # Rising Sun: Shadows from the deck
+                if _play_blocked(state, me, card) is None:
+                    result.append(PlayAction(card, True))
         if me.villagers > 0 and not state.no_more_actions:      # Renaissance: Villagers give Actions in the Action phase
             result.append(SpendVillager(1))
             if me.villagers > 1:
@@ -257,11 +263,11 @@ def legal_actions(state: GameState, player: Optional[int] = None) -> list:
         result.append(PayDebt(1))
         if min(me.debt, state.coins) > 1:
             result.append(PayDebt(min(me.debt, state.coins)))
-    if state.buys >= 1 and me.debt == 0:
+    if can_buy(state) and me.debt == 0:
         for name in state.events:                               # Adventures: Events are bought with a Buy, even when cards cannot be bought
             if validate(state, actor, BuyEvent(name)) is None:
                 result.append(BuyEvent(name))
-    if state.buys >= 1 and not state.buy_locked and me.debt == 0:
+    if can_buy(state) and not state.buy_locked and me.debt == 0:
         for name in sorted(state.supply):
             if state.supply[name] > 0 and (card_cost(state, name) <= state.coins or _fair_by_trashing(name, me)) and not is_walled(state, name, actor) and not is_buried(state, name) and state.potions >= get_card(name).potion_cost and _buy_restriction(state, name) is None:
                 result.append(Buy(name))
@@ -276,8 +282,10 @@ MAX_OVERPAY_OPTIONS = 12      # at most this many different overpayments are off
 
 
 # ------------------------------------------------------------------ helpers
-def _is_action(me, card: str) -> bool:
-    """An Action card, or an Estate that Inheritance has turned into an Action for this player."""
+def _is_action(me, card: str, state=None) -> bool:
+    """An Action card (a Treasure too under Enlightenment), or an Estate that Inheritance has turned into an Action for this player."""
+    if state is not None and has_type(state, card, CardType.ACTION):
+        return True
     return get_card(card).is_type(CardType.ACTION) or (card == "Estate" and me.inherited is not None)
 
 

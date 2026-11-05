@@ -63,13 +63,21 @@ def take_top_cards(state: GameState, player_index: int, count: int, star: bool =
                 state.star_draws.append([player_index, count - len(taken), "ally"])
                 break
             shuffled, player.discard = player.discard, []
-            state.rng.shuffle(shuffled)
+            shuffle_deck(state, shuffled)
             player.deck = shuffled
             if star and "Star Chart" in player.projects:       # Renaissance: stop to let the owner pick the top card, then finish the draw
                 state.star_draws.append([player_index, count - len(taken)])
                 break
         taken.append(player.deck.pop())
     return taken
+
+
+def shuffle_deck(state, cards: list) -> None:
+    """Shuffle a deck (a list whose END is the top). Shadow cards (Rising Sun) go to the bottom, which is the START of the list."""
+    state.rng.shuffle(cards)
+    if any(get_card(c).is_type(CardType.SHADOW) for c in cards):
+        shadows = [c for c in cards if get_card(c).is_type(CardType.SHADOW)]
+        cards[:] = shadows + [c for c in cards if not get_card(c).is_type(CardType.SHADOW)]
 
 
 def draw_cards(state: GameState, player_index: int, count: int) -> list:

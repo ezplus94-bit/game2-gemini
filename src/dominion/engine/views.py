@@ -153,6 +153,10 @@ def build_view(game, player: int) -> dict:
     names |= set(s.trash) | set(me.hand) | {c for p in s.players for c in (*p.in_play, *p.tavern, *p.ghosted)}
     names |= {get_card(n).heirloom for n in (*s.kingdom, *([s.bane] if s.bane else [])) if get_card(n).heirloom}
     names |= set(me.plunder_aside)
+    if s.prophecy:
+        names.add(s.prophecy)
+    if s.riverboat:
+        names.add(s.riverboat)
     cards = {n: card_info(n, s) for n in sorted(names)}
     if s.loot or any(s.offsupply.get(n, 0) for n in LOOT_CARDS):
         cards["Loot"] = {"name": "Loot", "cost": 7, "potion_cost": 0, "debt_cost": 0, "overpay": False, "types": ["loot"], "min_players": 1, "expansion": "Plunder",
@@ -186,6 +190,9 @@ def build_view(game, player: int) -> dict:
         "offsupply": [{"name": n, "count": c, "ferryman": n == s.ferryman} for n, c in sorted(s.offsupply.items()) if n not in LOOT_CARDS]
                      + ([{"name": "Loot", "count": len(s.loot), "ferryman": False}] if s.loot or any(s.offsupply.get(n, 0) for n in LOOT_CARDS) else []),
         "traits": [{**card_info(n, s), "pile": pile} for pile, n in s.traits.items()],
+        "prophecy": ({**card_info(s.prophecy, s), "suns": s.suns, "active": s.prophecy_on} if s.prophecy else None),     # Rising Sun
+        "riverboat": s.riverboat,                                  # Rising Sun: the card Riverboat plays
+        "shadows_in_deck": sorted({c for c in me.deck if get_card(c).is_type(CardType.SHADOW)}),     # Rising Sun: playable from the deck
         "bane": s.bane,
         "events": [{**card_info(n, s), "once": get_card(n).once_per_turn, "used": bool(s.turn_counts.get("event:" + n)),
                     "owners": [i for i, p in enumerate(s.players) if n in p.projects]} for n in s.events],

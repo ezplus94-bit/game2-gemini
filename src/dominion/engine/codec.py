@@ -18,7 +18,7 @@ MAX_OVERPAY = 1000
 
 def action_to_dict(action: Action) -> dict:
     if isinstance(action, PlayAction):
-        return {"type": "play_action", "card": action.card}
+        return {"type": "play_action", "card": action.card, **({"from_deck": True} if action.from_deck else {})}
     if isinstance(action, PlayTreasure):
         return {"type": "play_treasure", "card": action.card}
     if isinstance(action, PlayAllTreasures):
@@ -55,7 +55,7 @@ def action_from_dict(data: Any) -> Action:
         raise ValueError("Action must be an object.")
     kind = data.get("type")
     if kind == "play_action":
-        return PlayAction(_card_name(data))
+        return PlayAction(_card_name(data), bool(data.get("from_deck", False)))
     if kind == "play_treasure":
         return PlayTreasure(_card_name(data))
     if kind == "play_all_treasures":

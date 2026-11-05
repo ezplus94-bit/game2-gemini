@@ -81,7 +81,7 @@ class EffectContext:
         return get_card(card).potion_cost
 
     def is_action(self, card: str) -> bool:
-        return get_card(card).is_type(CardType.ACTION)
+        return has_type(self._state, card, CardType.ACTION)          # (a Treasure too, under the Enlightenment Prophecy)
 
     def is_victory(self, card: str) -> bool:
         return get_card(card).is_type(CardType.VICTORY)
@@ -446,6 +446,9 @@ class EffectContext:
         from . import plunder
         snap = plunder.before_play(s)
         reckless = bool(s.traits) and plunder.trait_of(s, card) == "Reckless"      # Plunder: followed twice
+        if s.prophecy_on:
+            from . import risingsun
+            risingsun.treasure_play_bonus(s, self.player, card)                    # Rising Sun: Good Harvest, Panic
         yield from kiln_steps(s, self.player, card)                 # Menagerie: Kiln gains a copy first
         if definition.is_type(CardType.ACTION):                    # Renaissance: Capitalism made this Action a Treasure too
             s.played_log.append(card)
@@ -907,7 +910,7 @@ class EffectContext:
         for card in cards:
             me.discard.remove(card)
         me.deck.extend(cards)
-        self._state.rng.shuffle(me.deck)
+        zones.shuffle_deck(self._state, me.deck)
         self.log(f"{self._name()} shuffles {len(cards)} Action card(s) from their discard pile into their deck.")
 
     # ---- Dark Ages: mixed piles, Spoils / Madman / Mercenary, trashing
@@ -1121,7 +1124,7 @@ class EffectContext:
             rest.remove(card)
         me.discard = list(keep)
         me.deck.extend(rest)
-        self._state.rng.shuffle(me.deck)
+        zones.shuffle_deck(self._state, me.deck)
         self.log(f"{self._name()} shuffles {len(rest)} card(s) from their discard pile into their deck.")
 
     # ---- Empires: Debt, VP piles, split piles, Villa, Enchantress
@@ -1170,7 +1173,7 @@ class EffectContext:
         me = self._state.players[i]
         if not me.deck and me.discard:
             shuffled, me.discard = me.discard, []
-            self._state.rng.shuffle(shuffled)
+            zones.shuffle_deck(self._state, shuffled)
             me.deck = shuffled
         return me.deck[-1] if me.deck else None
 
@@ -1460,7 +1463,7 @@ class EffectContext:
         for card in cards:
             me.set_aside.remove(card)
         me.deck.extend(cards)
-        self._state.rng.shuffle(me.deck)
+        zones.shuffle_deck(self._state, me.deck)
         self.log(f"{self._name()} shuffles {len(cards)} card(s) into their deck.")
 
     def copies_available(self, names: Sequence[str]) -> tuple:
@@ -1890,6 +1893,33 @@ class EffectContext:
         getattr(me, source).remove(card)
         me.deck.insert(0, card)
 
+    # ---- Rising Sun: Sun tokens, debt-aware gaining, the Riverboat card
+    def remove_sun(self):
+        """Omens: remove a Sun token from the Prophecy (a generator: ``yield from ctx.remove_sun()``). The last one makes the Prophecy happen."""
+        from . import risingsun
+        yield from risingsun.remove_sun(self._state, self.player)
+
+    def riverboat_card(self) -> Optional[str]:
+        return self._state.riverboat
+
+    def gained_this_turn_count(self, player: Optional[int] = None) -> int:
+        return len(self._state.players[self.player if player is None else player].gained_turn)
+
+    def gold_gained_ever(self) -> bool:
+        return self._me().gold_gained
+
+    def gainable_with_debt(self, max_coin: int, max_debt: int) -> tuple:
+        """Supply cards costing up to $max_coin AND up to max_debt Debt (a card costing only Debt costs "$0 and that Debt"): Tanuki, Kintsugi."""
+        s = self._state
+        return tuple(
+            name for name in sorted(s.supply)
+            if s.supply[name] > 0 and not is_walled(s, name, self.player) and not is_buried(s, name)
+            and get_card(name).potion_cost == 0 and get_card(name).debt_cost <= max_debt and self.cost_of(name) <= max_coin
+        )
+
+    def set_aside_list(self) -> tuple:
+        return tuple(self._me().set_aside)
+
     # ---- end-of-turn triggers
     def add_trigger(self, event: str, handler: Callable) -> None:
         self._state.triggers.append(Trigger(event, self.source, handler, self.player))
@@ -1985,6 +2015,12 @@ def play_effect(state: GameState, player: int, card: str, on_play):
             yield from result
         return
     if enchant_replaces(state, player, card):
+        return
+    if state.prophecy_on and state.prophecy == "Enlightenment" and state.phase.value == "action" and get_card(card).is_type(CardType.TREASURE):
+        EffectContext(state, player, card).log(f"Enlightenment: {card} gives +1 Card and +1 Action instead.")      # Rising Sun
+        ctx = EffectContext(state, player, card)
+        ctx.draw(1)
+        ctx.add_actions(1)
         return
     ctx = EffectContext(state, player, card)
     ctx._chameleon = way == CHAMELEON

@@ -27,6 +27,8 @@ def card_cost(state: GameState, name: str) -> int:
         reduction += 1
     if "Canal" in state.players[state.current_player].projects:                                       # Renaissance: Canal, during your turns
         reduction += 1
+    if state.prophecy_on and state.prophecy == "Flourishing Trade":                                   # Rising Sun: cards cost $1 less
+        reduction += 1
     return max(0, card.cost - reduction)
 
 
@@ -57,3 +59,15 @@ def costs_more(state: GameState, a: str, b: str) -> bool:
     (Fortune $8 + 8 Debt costs more than Overlord 8 Debt, but Overlord does not cost more than Silver)."""
     ca, cb = full_cost(state, a), full_cost(state, b)
     return all(x >= y for x, y in zip(ca, cb)) and ca != cb
+
+
+def can_buy(state: GameState) -> bool:
+    """A Buy is left. Under the Flourishing Trade Prophecy an unused Action play can be used as a Buy."""
+    return state.buys >= 1 or (state.prophecy_on and state.prophecy == "Flourishing Trade" and state.actions >= 1)
+
+
+def spend_buy(state: GameState) -> None:
+    if state.buys >= 1:
+        state.buys -= 1
+    else:
+        state.actions -= 1

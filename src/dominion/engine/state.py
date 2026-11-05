@@ -174,6 +174,7 @@ class PlayerState:
     squirrel: int = 0                                # Menagerie: cards Way of the Squirrel draws at the end of this turn
     favors: int = 0                                  # Allies: Favor tokens
     garrison_tokens: int = 0                         # Allies: tokens on this player's Garrisons in play (drawn as cards next turn)
+    gold_gained: bool = False                          # Rising Sun: has this player gained a Gold this game (Kintsugi)
     plunder_aside: list = field(default_factory=list)  # Plunder: cards set aside on Cage, Grotto, Quartermaster, and by Prepare, Hasty and Patient (still yours)
     eot_hand: list = field(default_factory=list)       # Plunder: cards that go into the hand at the end of this turn (Puzzle Box, Deliver, Cage, Trickster)
     eot_deck: list = field(default_factory=list)       # Plunder: Tireless cards that go onto the deck at the end of this turn
@@ -306,6 +307,11 @@ class GameState:
     voyage_next: bool = False         # the next turn (an extra turn that is about to start) is a Voyage turn
     hand_plays: int = 0               # cards played from the hand this turn (Voyage)
     elder_cards: list = field(default_factory=list)   # Allies: cards Elder is playing right now (they get an extra choice)
+    card_sets: Optional[list] = None                  # the card sets a random Kingdom is drawn from (None = all): Divine Wind draws new piles from them
+    prophecy: Optional[str] = None                    # Rising Sun: the Prophecy of this game (there is one whenever an Omen is in the Kingdom)
+    suns: int = 0                                     # Rising Sun: Sun tokens still on it
+    prophecy_on: bool = False                         # Rising Sun: the last Sun token is gone, the Prophecy is in force
+    riverboat: Optional[str] = None                   # Rising Sun: the card set aside in setup for Riverboat
     traits: dict = field(default_factory=dict)        # Plunder: Kingdom pile -> the Trait lying on it
     loot: list = field(default_factory=list)          # Plunder: the Loot pile, top card first (the counts are also in offsupply)
     shaman: bool = False              # Plunder: Shaman is in the game (everyone gains from the trash at the start of their turn)

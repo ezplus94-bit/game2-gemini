@@ -802,7 +802,7 @@
     c.appendChild(el("span", "name", blind ? "???" : faceName(name)));
     if (blind) {
       c.appendChild(el("span", "cost", "?"));
-    } else if (info.cost !== "?" && !["landmark", "way", "trait", "boon", "hex", "state", "artifact"].some((t) => (info.types || []).includes(t))) {
+    } else if (info.cost !== "?" && !["landmark", "way", "trait", "prophecy", "boon", "hex", "state", "artifact"].some((t) => (info.types || []).includes(t))) {
       const price = priceOf(info);
       const cost = el("span", "cost" + (price < info.cost ? " cheaper" : ""));
       if (price < info.cost) cost.appendChild(el("s", "", String(info.cost)));
@@ -901,7 +901,7 @@
       body.appendChild(cardEl(name, { size: "big" }));
       const t = el("div", "help-text");
       t.appendChild(el("p", "", info.text || ""));
-      const bits = [info.types.includes("landmark") ? "Landmark" : info.types.includes("way") ? "Way" : info.types.includes("trait") ? "Trait" : ("Cost $" + info.cost + (info.potion_cost ? " + Potion" : "") + (info.debt_cost ? " + " + info.debt_cost + " Debt" : "")), typeLabel(info.types)];
+      const bits = [info.types.includes("landmark") ? "Landmark" : info.types.includes("way") ? "Way" : info.types.includes("trait") ? "Trait" : info.types.includes("prophecy") ? "Prophecy" : ("Cost $" + info.cost + (info.potion_cost ? " + Potion" : "") + (info.debt_cost ? " + " + info.debt_cost + " Debt" : "")), typeLabel(info.types)];
       if (info.expansion) bits.push(info.expansion === "Catastrophe" ? "Catastrophe (house rule)" : info.expansion + " set");
       t.appendChild(el("p", "muted", bits.join("  |  ")));
       if (view) {
@@ -1200,7 +1200,7 @@
   function renderGame() {
     showOnly("game");
     const v = view;
-    const legal = new Set(v.legal_actions.map((a) => a.type + ":" + (a.card || "")));
+    const legal = new Set(v.legal_actions.map((a) => (a.from_deck ? "play_action_deck" : a.type) + ":" + (a.card || "")));
     const has = (type, card) => legal.has(type + ":" + (card || ""));
     const canBuy = (name) => has("buy", name);
     const myTurn = v.acting_player === v.you && v.status === "active";
@@ -1361,12 +1361,22 @@
 
     const evBox = $("supply-events");                       // Adventures Events
     evBox.replaceChildren();
-    $("events-row").hidden = !((v.events && v.events.length) || (v.landmarks && v.landmarks.length) || (v.ways && v.ways.length) || (v.traits && v.traits.length));
+    $("events-row").hidden = !((v.events && v.events.length) || (v.landmarks && v.landmarks.length) || (v.ways && v.ways.length) || (v.traits && v.traits.length) || v.prophecy || v.riverboat);
     (v.ways || []).forEach((w) => {                            // Menagerie Ways: each Action you play may use the Way instead of its own text
       const c = cardEl(w.name, { sub: "Way" + (w.name === "Way of the Mouse" && v.mouse ? " | plays " + v.mouse : "") });
       makeInfoOnly(c);
       evBox.appendChild(c);
     });
+    if (v.prophecy) {                                          // Rising Sun: the Prophecy, with its Sun tokens
+      const c = cardEl(v.prophecy.name, { sub: "Prophecy | " + (v.prophecy.active ? "IN FORCE" : v.prophecy.suns + " Sun token" + (v.prophecy.suns === 1 ? "" : "s") + " left") });
+      makeInfoOnly(c);
+      evBox.appendChild(c);
+    }
+    if (v.riverboat) {                                         // Rising Sun: Riverboat plays this card
+      const c = cardEl(v.riverboat, { sub: "Set aside for Riverboat" });
+      makeInfoOnly(c);
+      evBox.appendChild(c);
+    }
     (v.traits || []).forEach((tr) => {                         // Plunder Traits: each lies on one Kingdom pile for the whole game
       const c = cardEl(tr.name, { sub: "Trait | on " + tr.pile });
       makeInfoOnly(c);
@@ -1427,6 +1437,12 @@
       hand.appendChild(c);
     });
     prevHand = counts;
+    (v.shadows_in_deck || []).forEach((name) => {                // Rising Sun: Shadow cards can be played from the deck
+      if (!has("play_action_deck", name)) return;
+      const c = cardEl(name, { count: "deck" });
+      makeClickable(c, () => act({ type: "play_action", card: name, from_deck: true }));
+      hand.appendChild(c);
+    });
     $("deckinfo").textContent = "(draw pile: " + me.deck_count + " card" + (me.deck_count === 1 ? "" : "s") + ")";
 
     renderDecision();

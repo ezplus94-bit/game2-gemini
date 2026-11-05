@@ -419,3 +419,11 @@ request from the players. It leaks an aggregate, not card identities.
   `PlayerState.plunder_aside` is the shared zone for cards set aside by Cage, Grotto, Quartermaster, Prepare, Hasty and Patient. Cheap is in `costs.card_cost`, Reckless in `effects.play_effect/resolve_treasure`.
 * `plunder.before_play/after_play_steps` wrap every Action and Treasure resolution (`Game._play_steps`, `EffectContext.resolve/resolve_treasure`): Harbor Village (`state.coin_ticks` counts +$ gains), Frigate, Flagship
   (a replay of the next non-Command Action) and Inspiring. Journey sets `seize_flag` plus `turn_counts["journey_keep"]` (nothing is discarded from play in that Clean-up).
+
+### Rising Sun hooks (update 25)
+* `cards/risingsun.py` holds the 50 cards; `engine/risingsun.py` the rules: `remove_sun` (every Omen: `yield from ctx.remove_sun()`), `happen` (Kind Emperor, Divine Wind), and one small hook per Prophecy
+  (`after_gain_steps`, `after_play_steps`, `treasure_play_bonus`, `start_of_turn_steps`, `start_cleanup_steps`, `end_cleanup_steps`); Flourishing Trade is in `costs.card_cost/can_buy/spend_buy`, Enlightenment in
+  `cardtypes.has_type` and `effects.play_effect`. State: `GameState.prophecy/suns/prophecy_on/riverboat/card_sets`, `PlayerState.gold_gained`.
+* Shadows: `PlayAction(card, from_deck=True)` (codec key `from_deck`), `rules.validate/legal_actions`, `Game._play_action`; every deck shuffle goes through `zones.shuffle_deck`, which puts Shadows at the bottom.
+* Setup (`setup.new_game`): `pick_prophecy` (explicit Prophecy names in `config.events` win; they are stripped before the landscape picks), Approaching Army's extra pile (the resolved config keeps the host's
+  10 cards, so a replay adds the same pile again), `pick_riverboat`. Daimyo uses `turn_counts["daimyo"]` and shares Flagship's replay code in `plunder.after_play_steps`.

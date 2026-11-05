@@ -9,6 +9,8 @@ def has_type(state, name: str, card_type: CardType, capitalism: bool = True) -> 
     card = get_card(name)
     if card.is_type(card_type):
         return True
+    if card_type is CardType.ACTION and state.prophecy_on and state.prophecy == "Enlightenment" and card.is_type(CardType.TREASURE):
+        return True                                               # Rising Sun: Enlightenment makes Treasures Actions too
     if card_type is CardType.TREASURE:
         if name == "Curse" and state.curse_treasure:
             return True

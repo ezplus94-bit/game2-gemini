@@ -13,8 +13,9 @@ from typing import Union
 
 @dataclass(frozen=True)
 class PlayAction:
-    """Play an Action card from hand (Action phase)."""
+    """Play an Action card from hand (Action phase). ``from_deck``: a Shadow card (Rising Sun) played from the deck instead."""
     card: str
+    from_deck: bool = False
 
 
 @dataclass(frozen=True)

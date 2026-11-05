@@ -51,6 +51,9 @@ class CardType(str, Enum):
     ODYSSEY = "odyssey"              # Allies: the Odysseys
     TOWNSFOLK = "townsfolk"          # Allies: the Townsfolk
     WIZARD = "wizard"                # Allies: the Wizards
+    SHADOW = "shadow"                # Rising Sun: can also be played from the deck during the Action phase; goes to the bottom when shuffled
+    OMEN = "omen"                    # Rising Sun: its first line is "+1 Sun"
+    PROPHECY = "prophecy"            # Rising Sun: a landscape card with Sun tokens; its rule starts when the last one is gone
     LOOT = "loot"                    # Plunder: the 15 Loot Treasures (a shuffled pile outside the Supply, gained only with cards that say so)
     TRAIT = "trait"                  # Plunder: a landscape card laid on one Action or Treasure Kingdom pile for the whole game
 
