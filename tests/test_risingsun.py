@@ -503,3 +503,13 @@ def test_replay_is_exact_with_rising_sun():
     r = replay(g.config, g.history)
     assert [p.all_cards() for p in r.state.players] == [p.all_cards() for p in g.state.players]
     assert (r.state.prophecy, r.state.suns, r.state.kingdom) == (g.state.prophecy, g.state.suns, g.state.kingdom)
+
+
+def test_foresight_with_no_action_in_the_whole_deck_stops():
+    g = rg(["Village"], extras=["Foresight"], active=False)
+    set_zones(g, hand=["Copper"] * 5, deck=["Copper", "Estate"], discard=["Silver", "Copper"])
+    to_buy_phase(g)
+    g.state.coins = 2
+    before = total_cards(g)
+    buy(g, "Foresight")
+    assert total_cards(g) == before and not me(g).eot_hand and len(me(g).discard) == 4 and not me(g).deck
