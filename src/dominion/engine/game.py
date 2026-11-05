@@ -656,6 +656,7 @@ class Game:
         if journey:                                            # Plunder: Journey leaves the cards in play
             staying.extend(remaining)
             remaining = []
+        me.in_play[:] = [*staying, *remaining]                 # (Scheme and Horn already moved cards: in_play must not show them twice while a decision waits)
         yield from plunder.end_cleanup_steps(s, player, remaining)   # Plunder: Trickster, Tireless, Reckless
         risingsun.end_cleanup_steps(s, player, remaining)            # Rising Sun: Panic
         for other_index, other in enumerate(s.players):          # Menagerie: Reactions played on another player's turn are discarded in this Clean-up

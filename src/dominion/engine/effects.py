@@ -970,7 +970,13 @@ class EffectContext:
     def play_as(self, card: str):
         """Generator (Band of Misfits): run ``card``'s effect as if this card were that card. ``yield from ctx.play_as(card)``."""
         self._state.plays_this_turn += 1
-        result = get_card(card).on_play(EffectContext(self._state, self.player, self.source))
+        on_play = get_card(card).on_play
+        if on_play is None:                                   # a Treasure that Enlightenment (Rising Sun) made an Action: +1 Card, +1 Action
+            if self._state.prophecy_on and self._state.prophecy == "Enlightenment":
+                self.draw(1)
+                self.add_actions(1)
+            return
+        result = on_play(EffectContext(self._state, self.player, self.source))
         if inspect.isgenerator(result):
             yield from result
 

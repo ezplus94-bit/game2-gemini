@@ -371,15 +371,18 @@ def _credit(ctx):
 
 
 def _foresight(ctx):
+    missed = []                                       # (kept aside until the end: discarding them at once would shuffle them back into the draw)
     while True:
         cards = ctx.take_to_set_aside(1, reveal=True)
         if not cards:
-            return
+            break
         card = cards[0]
         if ctx.is_action(card):
             ctx.eot_hand(card, "set_aside")
             ctx.log(f"Foresight: {card} is set aside; it goes into your hand at end of turn.")
-            return
+            break
+        missed.append(card)
+    for card in missed:
         ctx.discard_set_aside(card)
 
 
