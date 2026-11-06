@@ -367,8 +367,8 @@ def test_host_chooses_card_sets_in_the_lobby():
         m = RoomManager(bot_delay=0)
         host, guest, _ = await two_player_room(m)
         lobby = host.last("lobby")
-        assert lobby["expansions"] == ["Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Plunder", "Prosperity", "Renaissance", "Rising Sun", "Seaside"] and lobby["available_expansions"] == ["Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Plunder", "Prosperity", "Renaissance", "Rising Sun", "Seaside"]
-        assert {c["expansion"] for c in lobby["available"]} == {"Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Plunder", "Prosperity", "Renaissance", "Rising Sun", "Seaside"} and len(lobby["available"]) == 456
+        assert lobby["expansions"] == ["Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Plunder", "Promos", "Prosperity", "Renaissance", "Rising Sun", "Seaside"] and lobby["available_expansions"] == ["Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Plunder", "Promos", "Prosperity", "Renaissance", "Rising Sun", "Seaside"]
+        assert {c["expansion"] for c in lobby["available"]} == {"Base", "Adventures", "Alchemy", "Allies", "Cornucopia & Guilds", "Dark Ages", "Empires", "Hinterlands", "Intrigue", "Menagerie", "Nocturne", "Plunder", "Promos", "Prosperity", "Renaissance", "Rising Sun", "Seaside"} and len(lobby["available"]) == 498
         await guest.say(type="set_expansions", expansions=["Base"])
         assert guest.last_error() == "Only the host can do that."
         for bad in ([], ["Nope"], ["Base", "Base"], "Base", None, [1], ["Base", "Nope"]):

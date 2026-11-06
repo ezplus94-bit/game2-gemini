@@ -461,7 +461,8 @@ def test_divine_wind_replaces_the_kingdom():
     set_zones(g, hand=["Poet"], deck=["Copper"] * 10)
     play(g, "Poet")
     assert g.state.prophecy_on and len(g.state.kingdom) == 10 and not (old & set(g.state.kingdom))
-    assert all(c in g.state.supply for c in g.state.kingdom) and not any(c in g.state.supply for c in old if c not in g.state.kingdom)
+    assert all(c in g.state.supply or c in g.state.stacks for c in g.state.kingdom)
+    assert not any(c in g.state.supply for c in old if c not in g.state.kingdom and c not in g.state.stack_of)
 
 
 # ------------------------------------------------------------------ whole games

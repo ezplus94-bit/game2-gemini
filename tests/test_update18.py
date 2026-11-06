@@ -60,7 +60,7 @@ def log(g):
 # ------------------------------------------------------------------ the set
 def test_the_set():
     piles = kingdom_cards(["Adventures"])
-    assert len(piles) == 29 and "Page" in piles and "Teacher" not in piles and "Champion" not in piles
+    assert len(piles) == 30 and "Treasure Trove" in piles and "Page" in piles and "Teacher" not in piles and "Champion" not in piles
     assert sorted(supporting_cards("Adventures")) == sorted(
         ["Treasure Hunter", "Warrior", "Hero", "Champion", "Soldier", "Fugitive", "Disciple", "Teacher"])
     assert len(event_cards(["Adventures"])) == 20 and get_card("Pathfinding").cost == 8 and CardType.EVENT in get_card("Alms").types

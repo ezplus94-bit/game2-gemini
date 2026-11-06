@@ -14,7 +14,8 @@ from dominion.engine import (
 from dominion.engine.scoring import score_player
 from helpers import make_game, set_zones, to_buy_phase, total_cards
 
-SEASIDE = kingdom_cards(["Seaside"])
+# the 26 cards of the 1st edition (the 2022 cards were added later and have their own tests in test_addendum.py)
+SEASIDE = [c for c in kingdom_cards(["Seaside"]) if c not in ("Astrolabe", "Monkey", "Sea Chart", "Blockade", "Sailor", "Tide Pools", "Corsair", "Pirate", "Sea Witch")]
 
 
 def sg(players=2, cards=("Wharf",), seed=1, **kw):
@@ -71,7 +72,7 @@ def test_the_set_has_26_cards_with_the_printed_costs_and_types():
 def test_random_kingdoms_can_come_from_seaside_alone():
     for seed in range(8):
         k = new_game(GameConfig(["A", "B"], None, seed, expansions=["Seaside"])).state.kingdom
-        assert len(k) == 10 and set(k) <= set(SEASIDE)
+        assert len(k) == 10 and set(k) <= set(kingdom_cards(["Seaside"]))
 
 
 # ------------------------------------------------------------------ Duration cards

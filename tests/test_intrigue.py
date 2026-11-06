@@ -14,7 +14,8 @@ from dominion.engine.scoring import score_player
 from helpers import make_game, set_zones, to_buy_phase, total_cards
 from test_bots import play_checked
 
-IN = kingdom_cards(["Intrigue"])
+# the 26 cards of the 2nd edition (the retired 1st-edition cards were added later and have their own tests in test_addendum.py)
+IN = [c for c in kingdom_cards(["Intrigue"]) if c not in ("Secret Chamber", "Great Hall", "Coppersmith", "Scout", "Saboteur", "Tribute")]
 
 
 def ig(players=2, kingdom=None, seed=3):
@@ -79,9 +80,9 @@ def test_victory_sized_piles_for_double_type_cards():
 def test_random_kingdom_respects_chosen_expansions():
     for seed in range(20):
         k = new_game(GameConfig(["A", "B"], None, seed, expansions=["Intrigue"])).state.kingdom
-        assert len(k) == 10 and set(k) <= set(IN)
+        assert len(k) == 10 and set(k) <= set(kingdom_cards(["Intrigue"]))
         k = new_game(GameConfig(["A", "B"], None, seed, expansions=["Base"])).state.kingdom
-        assert not set(k) & set(IN)
+        assert not set(k) & set(kingdom_cards(["Intrigue"]))
     with pytest.raises(ValueError):
         new_game(GameConfig(["A", "B"], None, 1, expansions=["Nope"]))
     with pytest.raises(ValueError):

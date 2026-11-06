@@ -15,7 +15,8 @@ from dominion.engine.scoring import score_player
 from helpers import make_game, set_zones, to_buy_phase, total_cards
 
 SET = "Hinterlands"
-HL = kingdom_cards([SET])
+# the 26 cards of the 1st edition (the 2022 cards were added later and have their own tests in test_addendum.py)
+HL = [c for c in kingdom_cards([SET]) if c not in ("Guard Dog", "Nomads", "Trail", "Weaver", "Berserker", "Cauldron", "Souk", "Wheelwright", "Witch's Hut")]
 FILLER = ["Village", "Smithy", "Militia", "Moat", "Market", "Cellar"]
 
 
@@ -579,4 +580,4 @@ def test_big_money_finishes_a_hinterlands_game_and_views_build():
 
 def test_random_kingdom_can_be_limited_to_hinterlands():
     g = new_game(GameConfig(["A", "B"], None, 5, expansions=[SET]))
-    assert set(g.state.kingdom) <= set(HL) and len(g.state.kingdom) == 10
+    assert set(g.state.kingdom) <= set(kingdom_cards([SET])) and len(g.state.kingdom) == 10
