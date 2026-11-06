@@ -92,6 +92,9 @@ def new_game(config: GameConfig) -> Game:
     state.ways = tuple(way_names)
     state.ally = ally
     state.shaman = "Shaman" in used                            # Plunder
+    if "Black Market" in used:                                 # Promos: the Black Market deck
+        from . import addendum as addendum_rules
+        addendum_rules.build_black_market(state, used, seed, MULTI_PILES)
     state.card_sets = expansions                               # Rising Sun: Divine Wind deals new piles from these sets
     if prophecy:
         state.prophecy, state.suns = prophecy, risingsun_rules.SUNS[min(max(len(names), 2), 6)]
@@ -223,7 +226,7 @@ def _resolve_shelters(requested: Optional[bool], kingdom: list, seed: int) -> bo
 SHELTERS = ("Hovel", "Necropolis", "Overgrown Estate")
 KNIGHTS = ("Dame Anna", "Dame Josephine", "Dame Molly", "Dame Natalie", "Dame Sylvia",
            "Sir Bailey", "Sir Destry", "Sir Martin", "Sir Michael", "Sir Vander")
-SPLIT_PILES = {"Settlers": "Bustling Village", "Catapult": "Rocks", "Encampment": "Plunder",
+SPLIT_PILES = {"Sauna": "Avanto", "Settlers": "Bustling Village", "Catapult": "Rocks", "Encampment": "Plunder",
                "Gladiator": "Fortune", "Patrician": "Emporium"}                       # Empires: top half -> bottom half
 CASTLES = ("Humble Castle", "Crumbling Castle", "Small Castle", "Haunted Castle",
            "Opulent Castle", "Sprawling Castle", "Grand Castle", "King's Castle")

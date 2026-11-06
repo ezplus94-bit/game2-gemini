@@ -17,7 +17,7 @@ import inspect
 from typing import Optional
 
 from ..cards import CardType, get_card
-from . import allies, landmarks, menagerie, nocturne, plunder, renaissance, risingsun, zones
+from . import addendum, allies, landmarks, menagerie, nocturne, plunder, renaissance, risingsun, zones
 from .cardtypes import is_plain_treasure, is_treasure, treasure_coins
 from .actions import (
     Action, Buy, BuyEvent, Cheat, Choose, EndGame, EndPhase, PayDebt, PlayAction, PlayAllTreasures, PlayTreasure, Resign, SpendCoffers, SpendVillager,
@@ -418,6 +418,7 @@ class Game:
             yield from allies.after_gain_steps(s, event)             # Allies: Guildmaster, Garrison, Skirmisher and the Allies that trigger on a gain
             yield from plunder.after_gain_steps(s, event)            # Plunder: Traits, Rush, Mirror, Mining Road, waiting Durations, Mapmaker, Stowaway
             yield from risingsun.after_gain_steps(s, event)          # Rising Sun: the Prophecies that react to a gain, and the Gold Kintsugi remembers
+            yield from addendum.after_gain_steps(s, event)           # Monkey, Blockade, Cauldron, Sailor, Trail, Pirate
             if s.current_player == player and get_card(event.card).is_type(CardType.VICTORY) and s.turn_counts.get("Groundskeeper"):
                 EffectContext(s, player, "Groundskeeper").add_vp(s.turn_counts["Groundskeeper"])
             over = get_card(event.card).on_overpay                   # "Overpay:" (Guilds)
@@ -591,6 +592,7 @@ class Game:
         yield from allies.end_of_turn_steps(s, player, was_extra)          # Allies: Island Folk's extra turn
         yield from plunder.start_cleanup_steps(s, player)                  # Plunder: Friendly and Patient, \"at the start of Clean-up\"
         yield from risingsun.start_cleanup_steps(s, player)                # Rising Sun: River Shrine, Biding Time
+        yield from addendum.start_cleanup_steps(s, player)                 # Walled Village
         schemed = []                                         # Hinterlands: Scheme, "at the start of Clean-up"
         for _ in range(s.turn_counts.get("Scheme", 0)):
             kept = {n for e in me.durations for n in e.cards}
@@ -659,6 +661,7 @@ class Game:
         me.in_play[:] = [*staying, *remaining]                 # (Scheme and Horn already moved cards: in_play must not show them twice while a decision waits)
         yield from plunder.end_cleanup_steps(s, player, remaining)   # Plunder: Trickster, Tireless, Reckless
         risingsun.end_cleanup_steps(s, player, remaining)            # Rising Sun: Panic
+        addendum.end_cleanup_steps(s, player, remaining)             # Prince's Action goes back aside
         for other_index, other in enumerate(s.players):          # Menagerie: Reactions played on another player's turn are discarded in this Clean-up
             if other_index != player and other.in_play:
                 keep = [n for e in other.durations for n in e.cards]

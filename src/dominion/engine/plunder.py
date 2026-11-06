@@ -346,6 +346,8 @@ def wants_shuffle_pause(state: GameState, player: int) -> bool:
     me = state.players[player]
     if state.turn_counts.get("avoid", 0) > 0 and state.current_player == player and me.discard:
         return True
+    if "Stash" in me.discard:
+        return True
     return bool(state.traits) and any(trait_of(state, c) == "Fated" for c in me.discard)
 
 
@@ -379,9 +381,21 @@ def shuffle_steps(state: GameState, player: int):
         elif where.startswith("Put it on the bottom"):
             pool.remove(c)
             bottom.append(c)
+    stashes = []
+    for _ in range(pool.count("Stash")):                       # Promos: Stash may go anywhere in the shuffled deck
+        options = ("Shuffle it in", *(f"Put it {k} card{'s' if k != 1 else ''} down" for k in range(0, 11)), "Put it on the bottom")
+        (where,) = yield ctx.choose("Stash: you are shuffling. Where does it go?", options)
+        if where != "Shuffle it in":
+            pool.remove("Stash")
+            stashes.append(None if where == "Put it on the bottom" else int(where.split()[2]))
     shuffled = list(pool)
     zones.shuffle_deck(state, shuffled)
     me.deck = bottom + shuffled + list(reversed(top))
+    for depth in stashes:                                      # (the deck's END is its top)
+        if depth is None:
+            me.deck.insert(0, "Stash")
+        else:
+            me.deck.insert(max(0, len(me.deck) - depth), "Stash")
     me.discard = kept
     if kept or top or bottom:
         ctx.log(f"{me.name} sets cards aside while shuffling: {len(kept)} kept out, {len(top)} on top, {len(bottom)} on the bottom.")

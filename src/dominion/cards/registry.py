@@ -109,6 +109,16 @@ def ally_cards() -> list[str]:
     return sorted(name for name, card in _CARDS.items() if CardType.ALLY in card.types)
 
 
+def prize_cards() -> list[str]:
+    """The five Cornucopia Prizes (not in the Supply, gained with Tournament)."""
+    return sorted(name for name, card in _CARDS.items() if CardType.PRIZE in card.types)
+
+
+def reward_cards() -> list[str]:
+    """The six Cornucopia & Guilds Rewards (not in the Supply, gained with Joust)."""
+    return sorted(name for name, card in _CARDS.items() if CardType.REWARD in card.types)
+
+
 def prophecy_cards(expansions=None) -> list[str]:
     """Names of every Prophecy (Rising Sun)."""
     return sorted(name for name, card in _CARDS.items()

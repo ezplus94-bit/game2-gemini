@@ -308,6 +308,7 @@ class GameState:
     hand_plays: int = 0               # cards played from the hand this turn (Voyage)
     elder_cards: list = field(default_factory=list)   # Allies: cards Elder is playing right now (they get an extra choice)
     card_sets: Optional[list] = None                  # the card sets a random Kingdom is drawn from (None = all): Divine Wind draws new piles from them
+    black_market: list = field(default_factory=list)  # Promos: the Black Market deck, top card first (the cards are also counted in offsupply)
     prophecy: Optional[str] = None                    # Rising Sun: the Prophecy of this game (there is one whenever an Omen is in the Kingdom)
     suns: int = 0                                     # Rising Sun: Sun tokens still on it
     prophecy_on: bool = False                         # Rising Sun: the last Sun token is gone, the Prophecy is in force

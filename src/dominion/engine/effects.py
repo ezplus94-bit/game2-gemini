@@ -467,6 +467,8 @@ class EffectContext:
             value = 1                                         # Nocturne: Envious
         if s.midas and value < 3:
             value, potions, note = 3, 0, " as Gold"          # Midas Touch: everything turns to gold
+        if card == "Copper" and s.turn_counts.get("coppersmith"):
+            value += s.turn_counts["coppersmith"]                                  # Coppersmith: Copper produces an extra $1
         if reckless and not blanked:
             value, potions, note = value * 2, potions * 2, note + " (Reckless: twice)"
         s.turn_counts[card] = s.turn_counts.get(card, 0) + 1     # (Fool's Gold asks how often it was played before)
@@ -487,6 +489,8 @@ class EffectContext:
             self.log(f"{self._name()}'s Citadel plays {card} again.", "play", 1)
             yield from EffectContext(s, self.player, "Citadel").resolve(card)
         yield from ally_after_play(s, self.player, card)             # Allies: Circle of Witches, League of Shopkeepers
+        from . import addendum
+        yield from addendum.treasure_played_steps(s, self.player, card)       # Corsair, Sauna
         yield from plunder.after_play_steps(s, self.player, card, snap)       # Plunder: Inspiring
 
     def play_treasure(self, card: str, zone: str = "hand"):
@@ -1925,6 +1929,32 @@ class EffectContext:
 
     def set_aside_list(self) -> tuple:
         return tuple(self._me().set_aside)
+
+    # ---- Promos: Black Market deck, Prince
+    def black_market_reveal(self, n: int) -> list:
+        deck = self._state.black_market
+        cards, deck[:] = deck[:n], deck[n:]
+        return cards
+
+    def black_market_bottom(self, cards) -> None:
+        self._state.black_market.extend(cards)
+
+    def black_market_gain(self, card: str) -> bool:
+        s = self._state
+        ok = zones.gain_offsupply(s, self.player, card, "discard")
+        return ok
+
+    def buys_left(self) -> int:
+        return self._state.buys
+
+    def trash_self_to_aside(self, card: str) -> bool:
+        """Prince: set this card (in play) aside; it is still its owner's."""
+        me = self._me()
+        if card not in me.in_play:
+            return False
+        zones.move_card(self._state, self.player, card, "in_play", "plunder_aside")
+        self.log(f"{self._name()} sets {card} aside.")
+        return True
 
     # ---- end-of-turn triggers
     def add_trigger(self, event: str, handler: Callable) -> None:

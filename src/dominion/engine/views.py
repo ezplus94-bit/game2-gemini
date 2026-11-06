@@ -187,8 +187,9 @@ def build_view(game, player: int) -> dict:
         "trade_mat": s.trade_mat,
         "coffers": s.players[s.current_player].coffers,       # the tokens of whoever's turn it is
         "villagers": s.players[s.current_player].villagers,
-        "offsupply": [{"name": n, "count": c, "ferryman": n == s.ferryman} for n, c in sorted(s.offsupply.items()) if n not in LOOT_CARDS]
-                     + ([{"name": "Loot", "count": len(s.loot), "ferryman": False}] if s.loot or any(s.offsupply.get(n, 0) for n in LOOT_CARDS) else []),
+        "offsupply": [{"name": n, "count": c, "ferryman": n == s.ferryman} for n, c in sorted(s.offsupply.items()) if n not in LOOT_CARDS and n not in s.black_market]
+                     + ([{"name": "Loot", "count": len(s.loot), "ferryman": False}] if s.loot or any(s.offsupply.get(n, 0) for n in LOOT_CARDS) else [])
+                     + ([{"name": "Black Market", "count": len(s.black_market), "ferryman": False}] if s.black_market else []),
         "traits": [{**card_info(n, s), "pile": pile} for pile, n in s.traits.items()],
         "prophecy": ({**card_info(s.prophecy, s), "suns": s.suns, "active": s.prophecy_on} if s.prophecy else None),     # Rising Sun
         "riverboat": s.riverboat,                                  # Rising Sun: the card Riverboat plays

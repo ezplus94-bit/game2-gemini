@@ -172,6 +172,8 @@ def gain_offsupply(state: GameState, player_index: int, card: str, destination: 
     state.offsupply[card] -= 1
     if card in state.loot:                           # Plunder: Loot leaves the shuffled pile
         state.loot.remove(card)
+    if card in state.black_market:                   # Promos: so does a card bought from the Black Market deck
+        state.black_market.remove(card)
     note_gain(state, card)
     player = state.players[player_index]
     getattr(player, destination).append(card)
@@ -282,7 +284,7 @@ def tunnel_discarded(state: GameState, player_index: int, card: str) -> None:
         state.log.append(f"{state.players[player_index].name} reveals Tunnel.", "reveal", 1)
         if gain_card(state, player_index, "Gold"):
             state.log.append(f"{state.players[beneficiary(state, player_index)].name} gains Gold.", "gain", 1)
-    elif card == "Village Green" and not state.cleanup_active:
+    elif card in ("Village Green", "Trail", "Weaver") and not state.cleanup_active:
         state.discard_events.append((player_index, card))      # Menagerie: Village Green may be played when discarded (asked in Game._settle)
     elif card == "Faithful Hound" and not state.cleanup_active:
         player = state.players[player_index]
