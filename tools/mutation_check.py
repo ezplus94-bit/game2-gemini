@@ -120,7 +120,7 @@ MUTATIONS = [
 
 def run_tests(page_only: bool) -> bool:
     """Page mutations only need the browser tests; engine mutations skip them (much faster)."""
-    args = ["tests/test_update8.py", "tests/test_browser.py"] if page_only else ["--deselect", "tests/test_browser.py"]
+    args = ["tests/test_catastrophes_and_specials.py", "tests/test_browser.py"] if page_only else ["--deselect", "tests/test_browser.py"]
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-x", "-q", "-p", "no:cacheprovider", *args],
         cwd=ROOT, capture_output=True, text=True, timeout=900,

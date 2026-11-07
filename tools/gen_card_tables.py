@@ -73,6 +73,7 @@ def render_tables() -> str:
     groups.append(("Plunder Loot cards", sorted(supporting_cards("Plunder"), key=lambda n: (get_card(n).cost, n))))
     groups.append(("Plunder Events", sorted(event_cards(["Plunder"]), key=lambda n: (get_card(n).cost, n))))
     groups.append(("Plunder Traits", sorted(trait_cards(), key=lambda n: n)))
+    groups.append(("Promos supporting cards", sorted(supporting_cards("Promos"), key=lambda n: (get_card(n).cost, n))))
     groups.append(("Promos Events", sorted(event_cards(["Promos"]), key=lambda n: (get_card(n).cost, n))))
     groups.append(("Rising Sun Events", sorted(event_cards(["Rising Sun"]), key=lambda n: (get_card(n).cost, n))))
     groups.append(("Rising Sun Prophecies", sorted(prophecy_cards(), key=lambda n: n)))
@@ -149,6 +150,9 @@ def render_tables() -> str:
     pevs = sorted(event_cards(["Plunder"]), key=lambda n: (get_card(n).cost, n))
     out += ["", f"### Plunder Events ({len(pevs)}, bought with a Buy instead of gained; Events, Landmarks, Projects, Ways and Traits together: at most two per game)", ""]
     out += _table(pevs)
+    pro_sup = sorted(supporting_cards("Promos"), key=lambda n: (get_card(n).cost, n))
+    out += ["", f"### Promos supporting cards ({len(pro_sup)}, not a Kingdom pile of its own: Avanto is the bottom half of the Sauna/Avanto split pile)", ""]
+    out += _table(pro_sup)
     pro_ev = sorted(event_cards(["Promos"]), key=lambda n: (get_card(n).cost, n))
     out += ["", f"### Promos Events ({len(pro_ev)}, bought with a Buy instead of gained)", ""]
     out += _table(pro_ev)
