@@ -1,1 +1,0 @@
-"""Text-mode user interface."""
