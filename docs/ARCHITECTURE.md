@@ -192,13 +192,11 @@ open), `chat` / `chat_history`, `error` (message), `left` (optional `reason`, e.
   end games (clients return to the home screen). Persistence is a later step.
 
 ### Testing
-* `test_web_rooms.py`: protocol and room logic with fake connections.
-* `test_web_server.py`: a real uvicorn server and real WebSocket clients
-  (garbage input, two browsers + bot, reconnect over a new socket).
-* `test_web_fuzz.py`: a simulated playtest. Random players play full games through
-  the room protocol while dropping connections, rejoining with their token and
-  sending junk; every game must finish, never log an error, and never leak a
-  hidden card.
+* `test_web.py`: the web layer in one module: protocol and room logic with fake connections; a real uvicorn
+  server with real WebSocket clients (garbage input, two browsers + bot, reconnect over a new socket); chat and
+  undo; and a simulated playtest (random players play full games through the room protocol while dropping
+  connections, rejoining with their token and sending junk; every game must finish, never log an error, and
+  never leak a hidden card).
 * `test_browser.py` + `tests/browser/*.js`: the real `index.html` run in jsdom
   against a live server: two humans and a bot play a full game through the
   buttons (including card-choice prompts), plus automatic reconnect. Optional;
